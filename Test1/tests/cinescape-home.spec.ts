@@ -12,7 +12,7 @@ test('Cinescape demo booking flow reaches date and time selection', async ({ pag
     await expect(page).toHaveTitle(/Cinescape/i);
     await homePage.expectLoaded();
     await testInfo.attach('01-home-page-loaded', {
-      body: await page.screenshot(),
+      body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
   });
@@ -20,7 +20,7 @@ test('Cinescape demo booking flow reaches date and time selection', async ({ pag
   await test.step('Open the first movie session', async () => {
     await homePage.prepareFirstMovieSessionSelection();
     await testInfo.attach('02-book-now-selected-before-click', {
-      body: await page.screenshot(),
+      body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
     await homePage.openFirstMovieSession();
@@ -30,7 +30,7 @@ test('Cinescape demo booking flow reaches date and time selection', async ({ pag
     await expect(page.getByRole('heading', { name: 'Select Date & Time' })).toBeVisible();
     await expect(page).toHaveURL(/\/moviesessions\//);
     await testInfo.attach('03-date-and-time-selection-loaded', {
-      body: await page.screenshot(),
+      body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
   });
