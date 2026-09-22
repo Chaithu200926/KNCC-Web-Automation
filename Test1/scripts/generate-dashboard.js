@@ -40,9 +40,15 @@ function collectSuite(suite, ancestors = []) {
       const status = result.status || test.status || 'unknown';
       const snapshots = writeSnapshots(result.attachments, tests.length);
       const steps = flattenSteps(result.steps);
-      snapshots.forEach((snapshot, snapshotIndex) => {
-        const stepIndex = snapshotIndex === 0 ? 1 : 3;
-        if (steps[stepIndex]) steps[stepIndex].snapshot = snapshot;
+      const snapshotStepMap = {
+        '01-home-page-loaded': 'Verify the home page is ready',
+        '02-book-now-selected-before-click': 'Open the first movie session',
+        '03-date-and-time-selection-loaded': 'Verify date and time selection is available',
+      };
+      snapshots.forEach((snapshot) => {
+        const targetTitle = snapshotStepMap[snapshot.name];
+        const targetStep = steps.find((step) => step.title === targetTitle);
+        if (targetStep) targetStep.snapshot = snapshot;
       });
       tests.push({
         name: [...ancestors, spec.title].join(' › '),

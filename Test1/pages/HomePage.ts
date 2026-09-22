@@ -12,7 +12,7 @@ export class HomePage {
   }
 
   async open() {
-    await this.page.goto('/');
+    await this.page.goto('/', { waitUntil: 'domcontentloaded' });
   }
 
   async expectLoaded() {
@@ -21,9 +21,24 @@ export class HomePage {
     await expect(this.bookNowLinks.first()).toBeVisible();
   }
 
+  async prepareFirstMovieSessionSelection() {
+    const firstMovieSession = this.bookNowLinks.first();
+    await expect(firstMovieSession).toBeVisible();
+    await firstMovieSession.scrollIntoViewIfNeeded();
+    await firstMovieSession.focus();
+    await firstMovieSession.evaluate((element) => {
+      element.style.outline = '4px solid #ffd166';
+      element.style.outlineOffset = '5px';
+      element.style.boxShadow = '0 0 0 8px rgba(255, 209, 102, 0.35)';
+    });
+
+  }
+
   async openFirstMovieSession() {
-    const movieSessionUrl = await this.bookNowLinks.first().getAttribute('href');
+    const firstMovieSession = this.bookNowLinks.first();
+    const movieSessionUrl = await firstMovieSession.getAttribute('href');
     expect(movieSessionUrl).toBeTruthy();
-    await this.page.goto(movieSessionUrl!);
+    await firstMovieSession.evaluate((element) => (element as HTMLAnchorElement).click());
+    await this.page.waitForURL(/\/moviesessions\//, { waitUntil: 'domcontentloaded' });
   }
 }
