@@ -8,6 +8,19 @@ const outputPath = path.join(outputDir, 'index.html');
 const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
 const tests = [];
 
+function flattenSteps(steps, parentTitles = []) {
+  return (steps || []).flatMap((step) => {
+    const title = [...parentTitles, step.title].join(' › ');
+    const current = {
+      title,
+      duration: step.duration || 0,
+      status: step.error ? 'failed' : 'passed',
+      error: step.error?.message || '',
+    };
+    return [current, ...flattenSteps(step.steps, [...parentTitles, step.title])];
+  });
+}
+
 function collectSuite(suite, ancestors = []) {
   for (const spec of suite.specs || []) {
     for (const test of spec.tests || []) {
@@ -19,6 +32,7 @@ function collectSuite(suite, ancestors = []) {
         duration: result.duration || 0,
         browser: test.projectName || 'unknown',
         error: result.error?.message || '',
+        steps: flattenSteps(result.steps),
       });
     }
   }
@@ -45,7 +59,7 @@ const generatedAt = new Date().toISOString();
 
 const rows = tests.map((test) => `
   <tr>
-    <td><strong>${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}</td>
+    <td><strong>${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}<details><summary>View ${test.steps.length} execution steps</summary><ol class="steps">${test.steps.map((step) => `<li><span class="step-status ${step.status}">${step.status}</span><span>${safe(step.title)}</span><time>${(step.duration / 1000).toFixed(2)}s</time>${step.error ? `<small>${safe(step.error)}</small>` : ''}</li>`).join('')}</ol></details></td>
     <td><span class="status ${safe(test.status)}">${safe(test.status)}</span></td>
     <td>${safe(test.browser)}</td>
     <td>${(test.duration / 1000).toFixed(2)}s</td>
@@ -64,7 +78,7 @@ main { max-width:1180px; margin:auto; padding:42px 24px 64px; } header { display
 .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:18px; } .card { background:rgba(24,38,49,.92); border:1px solid var(--line); border-radius:10px; padding:20px; } .metric { font-size:32px; font-weight:750; } .metric-label { color:var(--muted); }
 .content { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; } .chart { display:flex; gap:28px; align-items:center; } .donut { width:150px; aspect-ratio:1; border-radius:50%; background:conic-gradient(var(--green) ${passRate}%, var(--red) ${passRate}% ${Math.min(100, passRate + (total ? failed / total * 100 : 0))}%, var(--amber) 0); display:grid; place-items:center; } .donut:after { content:'${passRate}%'; width:102px; aspect-ratio:1; border-radius:50%; background:var(--panel); display:grid; place-items:center; font-size:24px; font-weight:700; } .legend { display:grid; gap:9px; } .key { display:flex; gap:9px; align-items:center; } .dot { width:10px; height:10px; border-radius:50%; background:var(--green); } .dot.fail { background:var(--red); } .dot.skip { background:var(--amber); }
 .bars { display:grid; gap:14px; } .bar-row { display:grid; grid-template-columns:90px 1fr 35px; gap:10px; align-items:center; } .track { background:#0e171d; height:12px; border-radius:20px; overflow:hidden; } .fill { height:100%; background:var(--green); border-radius:20px; } .fill.fail { background:var(--red); } .fill.skip { background:var(--amber); }
-table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:14px 12px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-weight:600; } td small { display:block; color:var(--red); margin-top:4px; word-break:break-word; } .status { display:inline-block; padding:3px 9px; border-radius:20px; background:#244434; color:var(--green); font-size:12px; text-transform:uppercase; } .status.failed,.status.timedOut { background:#512c32; color:var(--red); } .status.skipped { background:#554621; color:var(--amber); } footer { margin-top:20px; color:var(--muted); font-size:13px; }
+table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:14px 12px; border-bottom:1px solid var(--line); vertical-align:top; } th { color:var(--muted); font-weight:600; } td small { display:block; color:var(--red); margin-top:4px; word-break:break-word; } details { margin-top:12px; } summary { color:var(--cyan); cursor:pointer; font-size:13px; } .steps { margin:10px 0 0 18px; padding:0; display:grid; gap:8px; } .steps li { display:grid; grid-template-columns:62px 1fr auto; gap:8px; align-items:start; color:var(--muted); } .steps time { color:var(--muted); white-space:nowrap; } .step-status { font-size:10px; text-transform:uppercase; color:var(--green); } .step-status.failed { color:var(--red); } .status { display:inline-block; padding:3px 9px; border-radius:20px; background:#244434; color:var(--green); font-size:12px; text-transform:uppercase; } .status.failed,.status.timedOut { background:#512c32; color:var(--red); } .status.skipped { background:#554621; color:var(--amber); } footer { margin-top:20px; color:var(--muted); font-size:13px; }
 @media (max-width:760px) { header,.content { display:block; } header > div:last-child { margin-top:12px; } .grid { grid-template-columns:repeat(2,1fr); } .card { margin-bottom:16px; } .chart { justify-content:center; margin-bottom:12px; } table { font-size:13px; } th:nth-child(3),td:nth-child(3) { display:none; } }
 </style>
 </head>
