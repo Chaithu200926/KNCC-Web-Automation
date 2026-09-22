@@ -7,7 +7,8 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "dashboard": "node scripts/generate-dashboard.js"
   },
   "keywords": [],
   "author": "",

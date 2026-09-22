@@ -10,6 +10,8 @@ on:
 permissions:
   contents: read
   checks: write
+  pages: write
+  id-token: write
 
 jobs:
   test:
@@ -39,6 +41,10 @@ jobs:
       - name: Run Playwright tests
         run: npm test
 
+      - name: Generate visual dashboard
+        if: always()
+        run: npm run dashboard
+
       - name: Publish test results
         if: always()
         uses: dorny/test-reporter@v2
@@ -54,3 +60,25 @@ jobs:
           name: playwright-report
           path: Test1/playwright-report/
           retention-days: 14
+
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload dashboard for GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: Test1/dashboard
+
+  deploy-dashboard:
+    if: github.event_name != 'pull_request' && needs.test.result == 'success'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy dashboard to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
