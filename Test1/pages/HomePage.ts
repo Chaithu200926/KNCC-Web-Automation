@@ -34,25 +34,34 @@ export class HomePage {
     await firstMovieSession.evaluate((element) => {
       const existingMarker = document.getElementById('playwright-click-marker');
       existingMarker?.remove();
+      const button = element.querySelector('button');
+      const highlight = '4px solid #ffd166';
 
-      const bounds = element.getBoundingClientRect();
       const marker = document.createElement('div');
       marker.id = 'playwright-click-marker';
-      marker.textContent = '1  CLICK';
+      marker.textContent = 'STEP 2 - CLICK BOOK NOW';
       marker.style.cssText = [
-        'position:absolute',
-        `left:${Math.max(8, bounds.left + window.scrollX - 8)}px`,
-        `top:${Math.max(8, bounds.top + window.scrollY - 42)}px`,
+        'position:fixed',
+        'left:24px',
+        'top:88px',
         'z-index:2147483647',
-        'padding:6px 10px',
-        'border:3px solid #ff4d6d',
-        'border-radius:999px',
+        'padding:10px 16px',
+        'border:4px solid #ff4d6d',
+        'border-radius:8px',
         'background:#ff4d6d',
         'color:#ffffff',
-        'font:700 13px Arial,sans-serif',
+        'font:700 16px Arial,sans-serif',
         'box-shadow:0 2px 8px rgba(0,0,0,.45)',
         'pointer-events:none',
       ].join(';');
+      element.style.position = 'relative';
+      element.style.outline = highlight;
+      element.style.outlineOffset = '6px';
+      if (button) {
+        button.style.outline = highlight;
+        button.style.outlineOffset = '4px';
+        button.style.boxShadow = '0 0 0 8px rgba(255, 209, 102, 0.45)';
+      }
       document.body.appendChild(marker);
     });
 
@@ -63,6 +72,6 @@ export class HomePage {
     const movieSessionUrl = await firstMovieSession.getAttribute('href');
     expect(movieSessionUrl).toBeTruthy();
     await firstMovieSession.evaluate((element) => (element as HTMLAnchorElement).click());
-    await this.page.waitForURL(/\/moviesessions\//, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('domcontentloaded');
   }
 }
