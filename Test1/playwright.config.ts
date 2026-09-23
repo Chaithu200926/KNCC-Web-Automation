@@ -1,6 +1,7 @@
 /// <reference types="node" />
 
 import { defineConfig, devices } from '@playwright/test';
+import { testConfig } from './config/test-config';
 
 /**
  * Read environment variables from file.
@@ -33,7 +34,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL used by the Cinescape smoke test. */
-    baseURL: process.env.BASE_URL ?? 'https://uatweb.cinescape.com.kw',
+    baseURL: testConfig.urls.home,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on',

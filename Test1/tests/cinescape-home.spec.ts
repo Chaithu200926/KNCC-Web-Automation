@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { HomePage } from '../pages/HomePage';
 
-test('Cinescape demo booking flow reaches date and time selection', async ({ page }, testInfo) => {
+test('Cinescape demo booking flow reaches date and time selection', async ({ page, testConfig }, testInfo) => {
   const homePage = new HomePage(page);
 
   await test.step('Open the Cinescape home page', async () => {
-    await homePage.open();
+    await homePage.open(testConfig.urls.home);
   });
 
   await test.step('Verify the home page is ready', async () => {

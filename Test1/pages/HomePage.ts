@@ -4,21 +4,54 @@ export class HomePage {
   readonly logo: Locator;
   readonly nowShowing: Locator;
   readonly bookNowLinks: Locator;
+  readonly experienceSection: Locator;
+  readonly locationSection: Locator;
+  readonly promotionsSection: Locator;
 
   constructor(private readonly page: Page) {
     this.logo = page.getByRole('img', { name: 'cinescape-logo' });
     this.nowShowing = page.getByRole('link', { name: 'Now Showing' }).first();
     this.bookNowLinks = page.locator('a[href*="/moviesessions/"]');
+    this.experienceSection = page.locator('section.experience-sect');
+    this.locationSection = page.locator('section.location-section');
+    this.promotionsSection = page.locator('section.promotions');
   }
 
-  async open() {
-    await this.page.goto('/', { waitUntil: 'domcontentloaded' });
+  async open(url = '/') {
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
   }
 
   async expectLoaded() {
     await expect(this.logo).toBeVisible();
     await expect(this.nowShowing).toBeVisible();
     await expect(this.bookNowLinks.first()).toBeVisible();
+  }
+
+  async expectStaticNavigation() {
+    for (const name of ['Home', 'Movies', 'Experience', 'Promotions', 'News', 'Corporate', 'Contact Us']) {
+      const headerLink = this.page.locator('a').filter({ hasText: new RegExp(`^${name}$`, 'i') }).first();
+      await expect(headerLink).toBeAttached();
+    }
+  }
+
+  async expectHomepageContent() {
+    await expect(this.bookNowLinks.first()).toBeVisible();
+
+    await expect(this.experienceSection).toBeVisible();
+    await expect(this.experienceSection.locator('h3')).toHaveText(/Experiences/i);
+    await expect(this.experienceSection.locator('a[href="/experiences"]').first()).toBeVisible();
+    await expect(this.experienceSection.locator('img')).toHaveCount(4);
+
+    await expect(this.locationSection).toBeVisible();
+    await expect(this.locationSection.locator('h3')).toHaveText(/Cinescape Locations/i);
+    await expect(this.locationSection.locator('a[href*="/cinemasessions/"]').first()).toBeVisible();
+    await expect(this.locationSection.locator('p').first()).toBeVisible();
+
+    await expect(this.promotionsSection).toBeVisible();
+    await expect(this.promotionsSection.locator('h3')).toHaveText(/Events & Promotions/i);
+    await expect(this.promotionsSection.locator('a[href="/promotion"]').first()).toBeVisible();
+    await expect(this.promotionsSection.locator('img').first()).toBeAttached();
+    await expect(this.promotionsSection.locator('img').first()).toHaveAttribute('src', /.+/);
   }
 
   async prepareFirstMovieSessionSelection() {
