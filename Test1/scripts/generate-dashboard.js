@@ -44,11 +44,22 @@ function collectSuite(suite, ancestors = []) {
         '01-home-page-loaded': 'Verify the home page is ready',
         '02-book-now-selected-before-click': 'Open the first movie session',
         '03-date-and-time-selection-loaded': 'Verify date and time selection is available',
+        'homepage-loaded': 'Verify the homepage is available',
+        'header-cinescape-verified': 'Verify the Cinescape header',
+        'search-control-before-click': 'Click and verify Search',
+        'search-expanded': 'Click and verify Search',
+        'search-closed': 'Click and verify Search',
+        'profile-sign-in-dialog': 'Click and verify My Profile',
+        'returned-to-homepage': 'Click and verify My Profile',
+        'menu-opened': 'Click and verify Menu',
+        'menu-closed': 'Click and verify Menu',
       };
       snapshots.forEach((snapshot) => {
         const targetTitle = snapshotStepMap[snapshot.name];
         const targetStep = steps.find((step) => step.title === targetTitle);
-        if (targetStep) targetStep.snapshot = snapshot;
+        if (targetStep) {
+          targetStep.snapshots = [...(targetStep.snapshots || []), snapshot];
+        }
       });
       tests.push({
         name: [...ancestors, spec.title].join(' › '),
@@ -83,7 +94,7 @@ const generatedAt = new Date().toISOString();
 
 const rows = tests.map((test) => `
   <tr>
-    <td><strong>${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}<details><summary>View ${test.steps.length} execution steps</summary><ol class="steps">${test.steps.map((step) => `<li><span class="step-status ${step.status}">${step.status}</span><span>${safe(step.title)}${step.snapshot ? `<img class="snapshot" src="${step.snapshot.path}" alt="${safe(step.snapshot.name)} snapshot">` : ''}</span><time>${(step.duration / 1000).toFixed(2)}s</time>${step.error ? `<small>${safe(step.error)}</small>` : ''}</li>`).join('')}</ol></details></td>
+    <td><strong>${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}<details><summary>View ${test.steps.length} execution steps</summary><ol class="steps">${test.steps.map((step) => `<li><span class="step-status ${step.status}">${step.status}</span><span>${safe(step.title)}${(step.snapshots || []).map((snapshot) => `<img class="snapshot" src="${snapshot.path}" alt="${safe(snapshot.name)} snapshot">`).join('')}</span><time>${(step.duration / 1000).toFixed(2)}s</time>${step.error ? `<small>${safe(step.error)}</small>` : ''}</li>`).join('')}</ol></details></td>
     <td><span class="status ${safe(test.status)}">${safe(test.status)}</span></td>
     <td>${safe(test.browser)}</td>
     <td>${(test.duration / 1000).toFixed(2)}s</td>
@@ -119,7 +130,7 @@ table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding
   <div class="card"><h2>Test distribution</h2><div class="bars"><div class="bar-row"><span>Passed</span><div class="track"><div class="fill" style="width:${barWidth(passed)}%"></div></div><strong>${passed}</strong></div><div class="bar-row"><span>Failed</span><div class="track"><div class="fill fail" style="width:${barWidth(failed)}%"></div></div><strong>${failed}</strong></div><div class="bar-row"><span>Skipped</span><div class="track"><div class="fill skip" style="width:${barWidth(skipped)}%"></div></div><strong>${skipped}</strong></div></div></div>
 </section>
 <section class="card"><h2>Test details</h2><table><thead><tr><th>Test</th><th>Status</th><th>Browser</th><th>Duration</th></tr></thead><tbody>${rows || '<tr><td colspan="4">No tests found</td></tr>'}</tbody></table></section>
-<footer>Generated from Playwright JSON results. Download the Playwright report artifact for screenshots, videos, and traces.</footer>
+<footer>Generated from Playwright JSON results. Screenshots are shown with their verification steps.</footer>
 </main></body></html>`;
 
 fs.mkdirSync(outputDir, { recursive: true });
