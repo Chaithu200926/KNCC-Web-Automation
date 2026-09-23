@@ -50,14 +50,15 @@ test('Cinescape homepage loads successfully', async ({ page, testConfig }, testI
     });
   });
 
-  await test.step('Switch to Arabic and verify the Arabic homepage', async () => {
+  await test.step('Click Arabic button and verify the Arabic homepage', async () => {
     await expect(homePage.languageControl).toBeVisible();
-    await homePage.highlight(homePage.languageControl, 'STEP 6 - LANGUAGE CONTROL');
+    await expect(homePage.languageButton).toBeAttached();
+    await homePage.highlight(homePage.languageControl, 'STEP 6 - CLICK ARABIC BUTTON');
     await testInfo.attach('language-control-before-click', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
-    await homePage.languageControl.click();
+    await homePage.languageButton.click();
     await expect(page).toHaveURL(/uatweb\.cinescape\.com\.kw/);
     await expect(page.locator('body')).toContainText('بحث');
     await expect(page.locator('body')).toContainText('القائمة');
