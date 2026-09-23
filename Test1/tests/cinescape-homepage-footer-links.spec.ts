@@ -4,7 +4,7 @@ import { HomePage } from '../pages/HomePage';
 test('Homepage footer links navigation validation', async ({ page, testConfig }, testInfo) => {
   test.setTimeout(180_000);
   const homePage = new HomePage(page);
-  const footer = page.locator('footer:visible');
+  const footer = page.locator('footer:not(.footer-mobile):visible');
   const footerLinks = [
     { name: 'NOW SHOWING', path: '/movies' },
     { name: 'COMING SOON', path: '/movies?type=comingsoon' },
@@ -37,6 +37,15 @@ test('Homepage footer links navigation validation', async ({ page, testConfig },
 
   const slug = (value: string) => value.toLowerCase().replaceAll(' ', '-');
   const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const scrollTargetIntoView = async (locator: Parameters<HomePage['highlight']>[0]) => {
+    await locator.evaluate((element) => {
+      let target = element as HTMLElement;
+      while (target.parentElement && (target.getBoundingClientRect().width === 0 || target.getBoundingClientRect().height === 0)) {
+        target = target.parentElement;
+      }
+      target.scrollIntoView({ block: 'center', inline: 'nearest' });
+    });
+  };
   const returnHome = async (step: number, name: string, snapshotName = name) => {
     await homePage.open(testConfig.urls.home);
     await expect(page).toHaveURL(/uatweb\.cinescape\.com\.kw\/?$/);
@@ -49,10 +58,10 @@ test('Homepage footer links navigation validation', async ({ page, testConfig },
   };
 
   const verifyExternalLink = async (step: number, linkName: string, href: string, section: string) => {
-    const link = footer.locator(`a[href="${href}"]`).first();
+    const link = footer.locator(`a:visible[href="${href}"]`).first();
     await test.step(`Click and verify footer ${section} ${linkName}`, async () => {
       await expect(link).toBeVisible();
-      await link.scrollIntoViewIfNeeded();
+      await scrollTargetIntoView(link);
       await captureStep(
         `footer-${String(step).padStart(2, '0')}-${slug(section)}-${slug(linkName)}-click`,
         link,
@@ -94,9 +103,9 @@ test('Homepage footer links navigation validation', async ({ page, testConfig },
   for (const [index, controlName] of ['SIGN IN', 'REGISTER'].entries()) {
     const step = index + 4;
     await test.step(`Verify footer ${controlName} button`, async () => {
-      const control = footer.getByRole('link', { name: new RegExp(`^${controlName}$`, 'i') }).first();
+      const control = footer.locator('a:visible').filter({ hasText: new RegExp(`^${controlName}$`, 'i') }).first();
       await expect(control).toBeVisible();
-      await control.scrollIntoViewIfNeeded();
+      await scrollTargetIntoView(control);
       await captureStep(
         `footer-${String(step).padStart(2, '0')}-${slug(controlName)}-click`,
         control,
@@ -117,13 +126,13 @@ test('Homepage footer links navigation validation', async ({ page, testConfig },
 
   for (const [index, footerLink] of footerLinks.entries()) {
     const step = index + 6;
-    const link = footer.getByRole('link', { name: new RegExp(`^${footerLink.name}$`, 'i') }).first();
+    const link = footer.locator('a:visible').filter({ hasText: new RegExp(`^${footerLink.name}$`, 'i') }).first();
     const destination = new URL(footerLink.path, testConfig.urls.home).toString();
     const destinationPattern = new RegExp(`${destination.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`);
 
     await test.step(`Click and verify footer ${footerLink.name}`, async () => {
       await expect(link).toBeVisible();
-      await link.scrollIntoViewIfNeeded();
+      await scrollTargetIntoView(link);
       await captureStep(
         `footer-${String(step).padStart(2, '0')}-${slug(footerLink.name)}-click`,
         link,

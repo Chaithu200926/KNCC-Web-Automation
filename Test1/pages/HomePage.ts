@@ -84,6 +84,34 @@ export class HomePage {
   async highlight(locator: Locator, label: string) {
     await locator.evaluate((element, markerText) => {
       document.getElementById('playwright-report-marker')?.remove();
+      document.getElementById('playwright-report-highlight-box')?.remove();
+      document.querySelectorAll('[data-playwright-highlight]').forEach((highlighted) => {
+        highlighted.removeAttribute('data-playwright-highlight');
+        (highlighted as HTMLElement).style.outline = '';
+        (highlighted as HTMLElement).style.outlineOffset = '';
+        (highlighted as HTMLElement).style.boxShadow = '';
+         (highlighted as HTMLElement).style.backgroundColor = '';
+      });
+      let highlightTarget = element;
+      while (highlightTarget.parentElement && (highlightTarget.getBoundingClientRect().width === 0 || highlightTarget.getBoundingClientRect().height === 0)) {
+        highlightTarget = highlightTarget.parentElement;
+      }
+      const bounds = highlightTarget.getBoundingClientRect();
+      const highlightBox = document.createElement('div');
+      highlightBox.id = 'playwright-report-highlight-box';
+      highlightBox.style.cssText = [
+        'position:absolute',
+        `left:${Math.max(0, bounds.left + window.scrollX - 6)}px`,
+        `top:${Math.max(0, bounds.top + window.scrollY - 6)}px`,
+        `width:${bounds.width + 12}px`,
+        `height:${bounds.height + 12}px`,
+        'z-index:2147483646',
+        'border:4px solid #ffd166',
+        'border-radius:4px',
+        'box-shadow:0 0 0 5px rgba(255, 209, 102, 0.35)',
+        'pointer-events:none',
+      ].join(';');
+      document.body.appendChild(highlightBox);
       const marker = document.createElement('div');
       marker.id = 'playwright-report-marker';
       marker.textContent = markerText;
@@ -101,10 +129,11 @@ export class HomePage {
         'box-shadow:0 2px 8px rgba(0,0,0,.45)',
         'pointer-events:none',
       ].join(';');
-      element.setAttribute('data-playwright-highlight', 'true');
-      element.style.outline = '4px solid #ffd166';
-      element.style.outlineOffset = '6px';
-      element.style.boxShadow = '0 0 0 8px rgba(255, 209, 102, 0.35)';
+      highlightTarget.setAttribute('data-playwright-highlight', 'true');
+      highlightTarget.style.setProperty('outline', '4px solid #ffd166', 'important');
+      highlightTarget.style.setProperty('outline-offset', '6px', 'important');
+      highlightTarget.style.setProperty('box-shadow', '0 0 0 8px rgba(255, 209, 102, 0.35)', 'important');
+      highlightTarget.style.setProperty('background-color', '#ffd166', 'important');
       document.body.appendChild(marker);
     }, label);
     await this.page.waitForTimeout(500);
