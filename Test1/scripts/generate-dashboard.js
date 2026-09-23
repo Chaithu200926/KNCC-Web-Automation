@@ -58,10 +58,21 @@ function collectSuite(suite, ancestors = []) {
         'menu-closed': 'Click and verify Menu',
       };
       snapshots.forEach((snapshot) => {
-        const footerSnapshot = snapshot.name.match(/^footer-\d+-([a-z0-9-]+)-(click|landed|returned)$/i);
-        const footerTitle = footerSnapshot
-          ? `Click and verify footer ${footerSnapshot[1].replaceAll('-', ' ').toUpperCase()}`
-          : '';
+        const footerHeader = snapshot.name.match(/^footer-header-(.+)$/i);
+        const footerSnapshot = snapshot.name.match(/^footer-\d+-(.+)-(click|landed|returned)$/i);
+        let footerTitle = '';
+        if (footerHeader) {
+          footerTitle = `Verify footer header ${footerHeader[1].replaceAll('-', ' ').toUpperCase()}`;
+        } else if (footerSnapshot) {
+          const snapshotName = footerSnapshot[1].replaceAll('-', ' ').toUpperCase();
+          if (snapshotName.startsWith('DOWNLOAD OUR MOBILE APP ') || snapshotName.startsWith('SOCIAL MEDIA ')) {
+            footerTitle = `Click and verify footer ${snapshotName}`;
+          } else if (snapshotName === 'SIGN IN' || snapshotName === 'REGISTER') {
+            footerTitle = `Verify footer ${snapshotName} button`;
+          } else {
+            footerTitle = `Click and verify footer ${snapshotName}`;
+          }
+        }
         const targetTitle = snapshotStepMap[snapshot.name] || footerTitle;
         const targetStep = steps.find((step) => step.title === targetTitle);
         if (targetStep) {
