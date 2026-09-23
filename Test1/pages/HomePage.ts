@@ -7,6 +7,8 @@ export class HomePage {
   readonly header: Locator;
   readonly searchControl: Locator;
   readonly searchInput: Locator;
+  readonly languageControl: Locator;
+  readonly englishControl: Locator;
   readonly profileControl: Locator;
   readonly profileDialog: Locator;
   readonly menuControl: Locator;
@@ -22,6 +24,8 @@ export class HomePage {
     this.header = page.locator('img[alt="cinescape-logo"]').first();
     this.searchControl = page.locator('nav.header-nav .search-input-contain:visible');
     this.searchInput = page.locator('nav.header-nav input[type="search"]');
+    this.languageControl = page.locator('nav.header-nav .nav-right > .symbol > a:visible');
+    this.englishControl = page.locator('nav.header-nav .nav-right > .symbol:has-text("EN") > a:visible');
     this.profileControl = page.locator('nav.header-nav .user-profile:visible');
     this.profileDialog = page.locator('[role="dialog"]');
     this.menuControl = page.locator('nav.header-nav .nav-menu.pointer-cursor:visible');

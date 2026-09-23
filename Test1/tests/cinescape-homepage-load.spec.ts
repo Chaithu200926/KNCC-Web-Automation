@@ -50,19 +50,50 @@ test('Cinescape homepage loads successfully', async ({ page, testConfig }, testI
     });
   });
 
+  await test.step('Switch to Arabic and verify the Arabic homepage', async () => {
+    await expect(homePage.languageControl).toBeVisible();
+    await homePage.highlight(homePage.languageControl, 'STEP 6 - LANGUAGE CONTROL');
+    await testInfo.attach('language-control-before-click', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+    await homePage.languageControl.click();
+    await expect(page).toHaveURL(/uatweb\.cinescape\.com\.kw/);
+    await expect(page.locator('body')).toContainText('بحث');
+    await expect(page.locator('body')).toContainText('القائمة');
+    await expect(homePage.englishControl).toHaveText('EN');
+    await homePage.highlight(homePage.englishControl, 'STEP 7 - ARABIC HOMEPAGE VERIFIED');
+    await testInfo.attach('arabic-homepage-verified', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+  });
+
+  await test.step('Return to English homepage', async () => {
+    await homePage.englishControl.click();
+    await expect(page).toHaveURL(/uatweb\.cinescape\.com\.kw/);
+    await expect(homePage.searchControl).toContainText('SEARCH');
+    await expect(homePage.menuControl).toContainText('MENU');
+    await homePage.highlight(homePage.logo, 'STEP 8 - ENGLISH HOMEPAGE RESTORED');
+    await testInfo.attach('english-homepage-restored', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+  });
+
   await test.step('Click and verify My Profile', async () => {
-    await homePage.highlight(homePage.profileControl, 'STEP 6 - MY PROFILE CONTROL');
+    await homePage.highlight(homePage.profileControl, 'STEP 9 - MY PROFILE CONTROL');
     await homePage.profileControl.click();
     await expect(homePage.profileDialog).toBeVisible();
     await expect(homePage.profileDialog).toContainText(/Sign in/i);
-    await homePage.highlight(homePage.profileDialog, 'STEP 7 - MY PROFILE SIGN-IN VERIFIED');
+    await homePage.highlight(homePage.profileDialog, 'STEP 10 - MY PROFILE SIGN-IN VERIFIED');
     await testInfo.attach('profile-sign-in-dialog', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
     await homePage.closeProfile();
     await expect(page).toHaveURL(/uatweb\.cinescape\.com\.kw/);
-    await homePage.highlight(homePage.logo, 'STEP 8 - RETURNED TO HOMEPAGE');
+    await homePage.highlight(homePage.logo, 'STEP 10 - RETURNED TO HOMEPAGE');
     await testInfo.attach('returned-to-homepage', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
@@ -70,16 +101,16 @@ test('Cinescape homepage loads successfully', async ({ page, testConfig }, testI
   });
 
   await test.step('Click and verify Menu', async () => {
-    await homePage.highlight(homePage.menuControl, 'STEP 9 - MENU CONTROL');
+    await homePage.highlight(homePage.menuControl, 'STEP 11 - MENU CONTROL');
     await homePage.menuControl.click();
     await expect(homePage.menuPanel.locator('a').filter({ hasText: /^HOME$/i }).first()).toBeAttached();
-    await homePage.highlight(homePage.menuPanel, 'STEP 10 - MENU NAVIGATION VERIFIED');
+    await homePage.highlight(homePage.menuPanel, 'STEP 12 - MENU NAVIGATION VERIFIED');
     await testInfo.attach('menu-opened', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
     await homePage.menuControl.click();
-    await homePage.highlight(homePage.logo, 'STEP 11 - MENU CLOSED, HOMEPAGE RESTORED');
+    await homePage.highlight(homePage.logo, 'STEP 13 - MENU CLOSED, HOMEPAGE RESTORED');
     await testInfo.attach('menu-closed', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
