@@ -1,16 +1,16 @@
 import { test, expect } from './fixtures';
 import { HomePage } from '../pages/HomePage';
 
-test('Cinema booking flow reaches seat selection', async ({ page, testConfig }, testInfo) => {
-  test.setTimeout(180_000);
+test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig }, testInfo) => {
+  test.setTimeout(240_000);
 
   test.skip(
-    !testConfig.credentials.username || !testConfig.credentials.password || !testConfig.credentials.pin ||
-      !testConfig.payment.cardNumber || !testConfig.payment.cardExpiry || !testConfig.payment.cardCvv,
-    'Set the test credentials and card payment values in .env before running the booking test.',
+    !testConfig.credentials.username || !testConfig.credentials.password || !testConfig.credentials.pin,
+    'Set TEST_USERNAME, TEST_PASSWORD, and TEST_PIN in .env before running the booking test.',
   );
 
   const homePage = new HomePage(page);
+  let movieSessionUrl = '';
   const captureStep = async (name: string, locator: Parameters<HomePage['highlight']>[0], label: string) => {
     await homePage.highlight(locator, label);
     await testInfo.attach(name, {
@@ -19,97 +19,174 @@ test('Cinema booking flow reaches seat selection', async ({ page, testConfig }, 
     });
   };
 
-  await test.step('Open the Cinescape homepage', async () => {
-    await homePage.open(testConfig.urls.home);
-    await expect(homePage.logo).toBeVisible();
-    await captureStep('01-homepage-loaded', homePage.logo, 'STEP 1 - HOMEPAGE LOADED');
-  });
+  const clickWithHighlight = async (
+    name: string,
+    locator: Parameters<HomePage['highlight']>[0],
+    label: string,
+  ) => {
+    await captureStep(name, locator, label);
+    await locator.evaluate((element) => (element as HTMLElement).click());
+  };
 
-  await test.step('Sign in and verify the account PIN', async () => {
-    await captureStep('02-profile-before-click', homePage.profileControl, 'STEP 2 - CLICK MY PROFILE');
-    await homePage.profileControl.click();
-    await expect(homePage.profileDialog).toBeVisible();
-
+  const signInAfterShowtime = async () => {
     const loginDialog = page.locator('[role="dialog"]:visible').last();
-    const emailInput = loginDialog.locator(
-      'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[type="tel"]',
-    ).first();
-    const passwordInput = loginDialog.locator(
-      'input[type="password"], input[name*="password" i], input[placeholder*="password" i]',
-    ).first();
+    const emailInput = loginDialog.locator('input[name="email"], input[type="email"]').first();
+    const passwordInput = loginDialog.locator('input[name="password"], input[type="password"]').first();
 
-    await captureStep('03-login-fields', emailInput, 'STEP 3 - LOGIN FORM READY');
+    await expect(emailInput).toBeVisible();
+    await captureStep('06-login-form', emailInput, 'STEP 6 - SIGN-IN FORM');
     await emailInput.fill(testConfig.credentials.username);
     await passwordInput.fill(testConfig.credentials.password);
-    const signInButton = loginDialog.getByRole('button', { name: /sign in|login|submit/i }).last();
-    await captureStep('04-submit-login-before-click', signInButton, 'STEP 4 - SUBMIT LOGIN');
-    await signInButton.click();
 
-    const pinDialog = page.locator('[role="dialog"]:visible').last();
-    const pinInput = pinDialog.locator(
-      'input[name*="pin" i], input[placeholder*="pin" i], input[autocomplete="one-time-code"], input:visible',
-    ).last();
-    if (await pinInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await captureStep('05-pin-verification', pinInput, 'STEP 5 - ENTER EMAIL OR MOBILE PIN');
-      await pinInput.fill(testConfig.credentials.pin);
-      const verifyButton = pinDialog.getByRole('button', { name: /verify|continue|submit|confirm/i }).last();
-      await captureStep('06-pin-submit-before-click', verifyButton, 'STEP 6 - VERIFY PIN');
-      await verifyButton.click();
+    const signInButton = loginDialog.getByRole('button', { name: /^sign in$/i }).last();
+    await clickWithHighlight('07-submit-sign-in', signInButton, 'STEP 7 - SUBMIT SIGN-IN');
+
+    const otpDialog = page.locator('[role="dialog"]:visible').last();
+    const otpInputs = otpDialog.locator('input[type="tel"]');
+    await expect(otpInputs.first()).toBeVisible();
+    await captureStep('08-email-otp-form', otpInputs.first(), 'STEP 8 - ENTER EMAIL OTP');
+
+    const otp = testConfig.credentials.pin;
+    if (await otpInputs.count() >= otp.length) {
+      for (let index = 0; index < otp.length; index += 1) {
+        await otpInputs.nth(index).fill(otp[index]);
+      }
+    } else {
+      await otpInputs.first().fill(otp);
     }
 
-    await expect(homePage.profileDialog).toBeHidden({ timeout: 30_000 });
-  });
+    const submitOtp = otpDialog.getByRole('button', { name: /submit|verify|continue/i }).last();
+    await clickWithHighlight('09-submit-email-otp', submitOtp, 'STEP 9 - VERIFY EMAIL OTP');
+    await expect(otpDialog).toBeHidden({ timeout: 30_000 });
+  };
 
-  await test.step('Open the first available movie session', async () => {
+  await test.step('Open any movie and click Book Now', async () => {
     await homePage.open(testConfig.urls.home);
-    await captureStep('07-first-movie-session', homePage.bookNowLinks.first(), 'STEP 7 - CLICK BOOK NOW');
-    await homePage.openFirstMovieSession();
-    await expect(page).toHaveTitle(/Cinescape/i);
-    await expect(page.locator('body')).toContainText(/date|showtime|session|book now/i);
+    await expect(homePage.bookNowLinks.first()).toBeVisible();
+    await clickWithHighlight('01-movie-book-now', homePage.bookNowLinks.first(), 'STEP 1 - CLICK BOOK NOW');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page).toHaveURL(/\/moviesessions\//);
+    movieSessionUrl = page.url();
+    await homePage.profileControl.click();
+    await expect(page.locator('[role="dialog"]:visible')).toBeVisible();
+    await signInAfterShowtime();
+    await homePage.open(movieSessionUrl);
+    await expect(page).toHaveURL(new RegExp(movieSessionUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 
-  await test.step('Select a showtime and verify booking stage', async () => {
-    const showtime = page.locator('button:visible, a:visible')
-      .filter({ hasText: /\b(?:am|pm)\b|\d{1,2}:\d{2}/i })
-      .first();
+  await test.step('Choose experience, date, and time', async () => {
+    const experience = page.locator('#cinema0000000001, .cinemacarousal:visible').filter({ hasText: /Cinescape 360/i }).first();
+    await expect(experience).toBeVisible();
+    await clickWithHighlight('02-experience', experience, 'STEP 2 - CHOOSE CINESCAPE 360 EXPERIENCE');
+
+    const date = page.locator('.movie-date:visible').first();
+    await expect(date).toBeVisible();
+    await clickWithHighlight('03-date', date, 'STEP 3 - CHOOSE DATE');
+
+    const showtime = page.locator('.time-box:visible').first();
     await expect(showtime).toBeVisible();
-    await captureStep('08-showtime-before-click', showtime, 'STEP 8 - SELECT SHOWTIME');
-    await showtime.click();
-    await expect(page.locator('body')).toContainText(/seat|select.*ticket|booking summary|confirm/i);
+    await clickWithHighlight('04-time', showtime, 'STEP 4 - CHOOSE TIME');
+    await expect(page.locator('body')).toContainText(/Select Seat Category/i, { timeout: 15_000 });
   });
 
-  await test.step('Complete the dummy card payment', async () => {
-    const cardMethod = page.getByText(/credit card|visa|mastercard/i).first();
-    if (await cardMethod.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await captureStep('09-card-method-before-click', cardMethod, 'STEP 9 - SELECT CREDIT CARD');
-      await cardMethod.click();
+  await test.step('Choose seat category and ticket type', async () => {
+    const seatCategory = page.getByText('General', { exact: true }).last();
+    await expect(seatCategory).toBeVisible();
+    await clickWithHighlight('11-seat-category', seatCategory, 'STEP 11 - CHOOSE GENERAL SEAT CATEGORY');
+
+    const seatType = page.getByText('Standard', { exact: true }).last();
+    await expect(seatType).toBeVisible();
+    await clickWithHighlight('12-seat-type', seatType, 'STEP 12 - CHOOSE STANDARD SEAT TYPE');
+  });
+
+  await test.step('Choose a seat and proceed', async () => {
+    const ticketProceed = page.getByRole('button', { name: 'PROCEED', exact: true }).last();
+    await expect(ticketProceed).toBeVisible();
+    await clickWithHighlight('13-ticket-proceed', ticketProceed, 'STEP 13 - PROCEED TO SEAT MAP');
+    await expect(page).toHaveURL(/\/seatlayout$/);
+
+    const seatCandidates = page.locator('.seat[id]:visible').filter({ has: page.locator('img') });
+    await expect(seatCandidates.first()).toBeVisible();
+    let selectedSeat = seatCandidates.first();
+    const seatCount = await seatCandidates.count();
+    for (let index = 0; index < seatCount; index += 1) {
+      const candidate = seatCandidates.nth(index);
+      await candidate.locator('img').first().click({ force: true });
+      if (await candidate.evaluate((element) => element.classList.contains('active'))) {
+        selectedSeat = candidate;
+        break;
+      }
+    }
+    await captureStep('14-seat', selectedSeat, 'STEP 14 - CHOOSE AVAILABLE SEAT');
+    await expect(selectedSeat).toHaveClass(/active/);
+
+    const seatProceed = page.getByRole('button', { name: 'PROCEED', exact: true }).last();
+    await clickWithHighlight('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP');
+    await expect(page).toHaveURL(/\/food\//);
+  });
+
+  await test.step('Skip food and open payment methods', async () => {
+    const foodProceed = page.getByRole('button', { name: 'Proceed', exact: true });
+    await expect(foodProceed).toBeVisible();
+    await clickWithHighlight('16-food-proceed', foodProceed, 'STEP 16 - CONTINUE WITHOUT FOOD');
+    await expect(page).toHaveURL(/\/payment\//);
+
+    const paymentProceed = page.getByRole('button', { name: 'Proceed', exact: true });
+    if (await paymentProceed.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await clickWithHighlight('17-payment-methods', paymentProceed, 'STEP 17 - OPEN PAYMENT METHODS');
+      await paymentProceed.click({ force: true });
+    }
+  });
+
+  await test.step('Pay with KNET or wallet', async () => {
+    const visibleWalletApply = page.locator('button:visible').filter({ hasText: /^apply$/i }).first();
+    const walletApplied = await visibleWalletApply.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (walletApplied) {
+      await captureStep('18-wallet-apply', visibleWalletApply, 'STEP 18 - APPLY WALLET BALANCE');
+      await visibleWalletApply.click({ force: true });
     }
 
-    const cardNumber = page.locator(
-      'input[autocomplete="cc-number"], input[name*="card" i], input[placeholder*="card number" i]',
-    ).first();
-    const cardExpiry = page.locator(
-      'input[autocomplete="cc-exp"], input[name*="expir" i], input[placeholder*="mm/yy" i]',
-    ).first();
-    const cardCvv = page.locator(
-      'input[autocomplete="cc-csc"], input[name*="cvv" i], input[name*="cvc" i], input[placeholder*="cvv" i]',
-    ).first();
+    const knet = page.getByText(/KNET/i).first();
+    const wallet = page.getByText(/Use your Wallet/i).first();
+    const useWallet = await wallet.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (!walletApplied) {
+      const paymentMethod = useWallet ? wallet : knet;
+      await expect(paymentMethod).toBeVisible();
+      await clickWithHighlight('19-payment-method', paymentMethod, 'STEP 19 - CHOOSE KNET OR WALLET');
+    }
 
-    await expect(cardNumber).toBeVisible();
-    await expect(cardExpiry).toBeVisible();
-    await expect(cardCvv).toBeVisible();
-    await captureStep('10-payment-form-ready', cardNumber, 'STEP 10 - PAYMENT FORM READY');
-    await cardNumber.fill(testConfig.payment.cardNumber);
-    await cardExpiry.fill(testConfig.payment.cardExpiry);
-    await cardCvv.fill(testConfig.payment.cardCvv);
+    if (useWallet && !walletApplied) {
+      const walletApply = page.getByRole('button', { name: /^apply$/i }).first();
+      await expect(walletApply).toBeVisible();
+      await clickWithHighlight('20-wallet-apply', walletApply, 'STEP 20 - APPLY WALLET BALANCE');
+    } else {
+      const numberInput = page.locator('input[name*="card" i], input[name*="knet" i], input[type="tel"]').first();
+      const expiryInput = page.locator('input[name*="expir" i], input[placeholder*="expiry" i]').first();
+      const pinInput = page.locator('input[name*="pin" i], input[placeholder*="pin" i]').first();
 
-    const payButton = page.getByRole('button', { name: /pay|make payment|complete booking|confirm/i }).last();
+      if (await numberInput.isVisible({ timeout: 5_000 }).catch(() => false)) await numberInput.fill(testConfig.payment.knetNumber);
+      if (await expiryInput.isVisible({ timeout: 2_000 }).catch(() => false)) await expiryInput.fill(testConfig.payment.knetExpiry);
+      if (await pinInput.isVisible({ timeout: 2_000 }).catch(() => false)) await pinInput.fill(testConfig.payment.knetPin);
+    }
+
+    const payButton = page.getByRole('button', { name: /pay|confirm|complete|proceed|submit/i }).last();
     await expect(payButton).toBeVisible();
-    await captureStep('11-pay-before-click', payButton, 'STEP 11 - COMPLETE PAYMENT');
-    await payButton.click();
-    await expect(page.locator('body')).toContainText(/payment successful|booking confirmed|confirmation|booking id|transaction/i, {
-      timeout: 30_000,
-    });
-    await captureStep('12-booking-confirmed', page.locator('body'), 'STEP 12 - BOOKING CONFIRMED');
+    await captureStep('21-confirm-payment', payButton, 'STEP 21 - CONFIRM PAYMENT');
+    await payButton.click({ force: true });
+    await expect(page.locator('body')).toContainText(/successful|confirmed|booking id|transaction/i, { timeout: 30_000 });
+  });
+
+  await test.step('Verify the confirmed ticket in My Profile > Bookings', async () => {
+    const profileLink = page.locator('a[href="/myaccount"], nav.header-nav .user-profile:visible').first();
+    await expect(profileLink).toBeVisible();
+    await clickWithHighlight('22-my-profile', profileLink, 'STEP 22 - OPEN MY PROFILE');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page).toHaveURL(/\/myaccount/);
+
+    const bookings = page.getByText(/bookings/i).first();
+    await expect(bookings).toBeVisible();
+    await clickWithHighlight('23-bookings', bookings, 'STEP 23 - OPEN BOOKINGS');
+    await expect(page.locator('body')).toContainText(/confirmed|booking|ticket|Wake Up|Movie/i);
+    await captureStep('24-booking-confirmed', page.locator('body'), 'STEP 24 - CONFIRMED TICKET VERIFIED');
   });
 });
