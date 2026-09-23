@@ -31,6 +31,7 @@ export default defineConfig({
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/results.xml' }],
     ['json', { outputFile: 'test-results/results.json' }],
+    ['./reporters/text-reporter.ts', { outputFile: 'test-results/test-execution.log.txt' }],
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
