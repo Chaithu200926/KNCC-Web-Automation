@@ -58,7 +58,11 @@ function collectSuite(suite, ancestors = []) {
         'menu-closed': 'Click and verify Menu',
       };
       snapshots.forEach((snapshot) => {
-        const targetTitle = snapshotStepMap[snapshot.name];
+        const footerSnapshot = snapshot.name.match(/^footer-\d+-([a-z0-9-]+)-(click|landed|returned)$/i);
+        const footerTitle = footerSnapshot
+          ? `Click and verify footer ${footerSnapshot[1].replaceAll('-', ' ').toUpperCase()}`
+          : '';
+        const targetTitle = snapshotStepMap[snapshot.name] || footerTitle;
         const targetStep = steps.find((step) => step.title === targetTitle);
         if (targetStep) {
           targetStep.snapshots = [...(targetStep.snapshots || []), snapshot];
