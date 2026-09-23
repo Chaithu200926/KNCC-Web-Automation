@@ -11,6 +11,7 @@ test('Cinescape demo booking flow reaches date and time selection', async ({ pag
   await test.step('Verify the home page is ready', async () => {
     await expect(page).toHaveTitle(/Cinescape/i);
     await homePage.expectLoaded();
+    await homePage.highlight(homePage.logo, 'STEP 1 - HOMEPAGE READY');
     await testInfo.attach('01-home-page-loaded', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
@@ -27,8 +28,10 @@ test('Cinescape demo booking flow reaches date and time selection', async ({ pag
   });
 
   await test.step('Verify date and time selection is available', async () => {
-    await expect(page.getByRole('heading', { name: 'Select Date & Time' })).toBeVisible();
+    const dateAndTimeHeading = page.getByRole('heading', { name: 'Select Date & Time' });
+    await expect(dateAndTimeHeading).toBeVisible();
     await expect(page).toHaveURL(/\/moviesessions\//);
+    await homePage.highlight(dateAndTimeHeading, 'STEP 3 - DATE AND TIME SELECTION VERIFIED');
     await testInfo.attach('03-date-and-time-selection-loaded', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
