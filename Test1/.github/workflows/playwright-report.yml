@@ -57,6 +57,7 @@ jobs:
         with:
           name: playwright-report-and-screenshots
           path: |
+            Test1/dashboard
             Test1/playwright-report
             Test1/test-results
           if-no-files-found: warn
