@@ -10,7 +10,6 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
   );
 
   const homePage = new HomePage(page);
-  let movieSessionUrl = '';
   const captureStep = async (name: string, locator: Parameters<HomePage['highlight']>[0], label: string) => {
     await homePage.highlight(locator, label);
     await testInfo.attach(name, {
@@ -66,12 +65,6 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await clickWithHighlight('01-movie-book-now', homePage.bookNowLinks.first(), 'STEP 1 - CLICK BOOK NOW');
     await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/moviesessions\//);
-    movieSessionUrl = page.url();
-    await homePage.profileControl.click();
-    await expect(page.locator('[role="dialog"]:visible')).toBeVisible();
-    await signInAfterShowtime();
-    await homePage.open(movieSessionUrl);
-    await expect(page).toHaveURL(new RegExp(movieSessionUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 
   await test.step('Choose experience, date, and time', async () => {
@@ -86,6 +79,12 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const showtime = page.locator('.time-box:visible').first();
     await expect(showtime).toBeVisible();
     await clickWithHighlight('04-time', showtime, 'STEP 4 - CHOOSE TIME');
+    await expect(page.locator('[role="dialog"]:visible')).toBeVisible();
+    await signInAfterShowtime();
+
+    const continuedShowtime = page.locator('.time-box:visible').first();
+    await expect(continuedShowtime).toBeVisible();
+    await continuedShowtime.click({ force: true });
     await expect(page.locator('body')).toContainText(/Select Seat Category/i, { timeout: 15_000 });
   });
 
@@ -121,19 +120,28 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await expect(selectedSeat).toHaveClass(/active/);
 
     const seatProceed = page.getByRole('button', { name: 'PROCEED', exact: true }).last();
-    await clickWithHighlight('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP');
+    await captureStep('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP');
+    await seatProceed.click({ force: true });
+    const bookingsFound = page.getByText('Bookings Found!', { exact: true });
+    if (await bookingsFound.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      const bookingModal = page.locator('text=Bookings Found!').locator('..').locator('..');
+      await captureStep('16-bookings-found', bookingModal, 'STEP 16 - EXISTING BOOKING DETECTED');
+      const continueBooking = page.getByRole('button', { name: /continue booking/i });
+      await expect(continueBooking).toBeVisible();
+      await continueBooking.click({ force: true });
+    }
     await expect(page).toHaveURL(/\/food\//);
   });
 
   await test.step('Skip food and open payment methods', async () => {
     const foodProceed = page.getByRole('button', { name: 'Proceed', exact: true });
     await expect(foodProceed).toBeVisible();
-    await clickWithHighlight('16-food-proceed', foodProceed, 'STEP 16 - CONTINUE WITHOUT FOOD');
+    await clickWithHighlight('17-food-proceed', foodProceed, 'STEP 17 - CONTINUE WITHOUT FOOD');
     await expect(page).toHaveURL(/\/payment\//);
 
     const paymentProceed = page.getByRole('button', { name: 'Proceed', exact: true });
     if (await paymentProceed.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await clickWithHighlight('17-payment-methods', paymentProceed, 'STEP 17 - OPEN PAYMENT METHODS');
+      await clickWithHighlight('18-payment-methods', paymentProceed, 'STEP 18 - OPEN PAYMENT METHODS');
       await paymentProceed.click({ force: true });
     }
   });
@@ -142,7 +150,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const visibleWalletApply = page.locator('button:visible').filter({ hasText: /^apply$/i }).first();
     const walletApplied = await visibleWalletApply.isVisible({ timeout: 5_000 }).catch(() => false);
     if (walletApplied) {
-      await captureStep('18-wallet-apply', visibleWalletApply, 'STEP 18 - APPLY WALLET BALANCE');
+      await captureStep('19-wallet-apply', visibleWalletApply, 'STEP 19 - APPLY WALLET BALANCE');
       await visibleWalletApply.click({ force: true });
     }
 
@@ -152,13 +160,13 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     if (!walletApplied) {
       const paymentMethod = useWallet ? wallet : knet;
       await expect(paymentMethod).toBeVisible();
-      await clickWithHighlight('19-payment-method', paymentMethod, 'STEP 19 - CHOOSE KNET OR WALLET');
+      await clickWithHighlight('20-payment-method', paymentMethod, 'STEP 20 - CHOOSE KNET OR WALLET');
     }
 
     if (useWallet && !walletApplied) {
       const walletApply = page.getByRole('button', { name: /^apply$/i }).first();
       await expect(walletApply).toBeVisible();
-      await clickWithHighlight('20-wallet-apply', walletApply, 'STEP 20 - APPLY WALLET BALANCE');
+      await clickWithHighlight('21-wallet-apply', walletApply, 'STEP 21 - APPLY WALLET BALANCE');
     } else {
       const numberInput = page.locator('input[name*="card" i], input[name*="knet" i], input[type="tel"]').first();
       const expiryInput = page.locator('input[name*="expir" i], input[placeholder*="expiry" i]').first();
@@ -171,7 +179,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
 
     const payButton = page.getByRole('button', { name: /pay|confirm|complete|proceed|submit/i }).last();
     await expect(payButton).toBeVisible();
-    await captureStep('21-confirm-payment', payButton, 'STEP 21 - CONFIRM PAYMENT');
+    await captureStep('22-confirm-payment', payButton, 'STEP 22 - CONFIRM PAYMENT');
     await payButton.click({ force: true });
     await expect(page.locator('body')).toContainText(/successful|confirmed|booking id|transaction/i, { timeout: 30_000 });
   });
@@ -179,14 +187,34 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
   await test.step('Verify the confirmed ticket in My Profile > Bookings', async () => {
     const profileLink = page.locator('a[href="/myaccount"], nav.header-nav .user-profile:visible').first();
     await expect(profileLink).toBeVisible();
-    await clickWithHighlight('22-my-profile', profileLink, 'STEP 22 - OPEN MY PROFILE');
+    await clickWithHighlight('23-my-profile', profileLink, 'STEP 23 - OPEN MY PROFILE');
     await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/myaccount/);
 
     const bookings = page.getByText(/bookings/i).first();
     await expect(bookings).toBeVisible();
-    await clickWithHighlight('23-bookings', bookings, 'STEP 23 - OPEN BOOKINGS');
+    await clickWithHighlight('24-bookings', bookings, 'STEP 24 - OPEN BOOKINGS');
     await expect(page.locator('body')).toContainText(/confirmed|booking|ticket|Wake Up|Movie/i);
-    await captureStep('24-booking-confirmed', page.locator('body'), 'STEP 24 - CONFIRMED TICKET VERIFIED');
+    await captureStep('25-booking-confirmed', page.locator('body'), 'STEP 25 - CONFIRMED TICKET VERIFIED');
+
+    const cancelBooking = page.locator('button:visible, a:visible')
+      .filter({ hasText: /cancel booking|cancel/i })
+      .first();
+    await expect(cancelBooking).toBeVisible();
+    await clickWithHighlight('26-cancel-booking', cancelBooking, 'STEP 26 - CANCEL CONFIRMED BOOKING');
+
+    const cancelConfirmation = page.locator('[role="dialog"]:visible').last();
+    if (await cancelConfirmation.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      const confirmCancel = cancelConfirmation
+        .getByRole('button', { name: /yes|confirm|cancel booking/i })
+        .last();
+      await expect(confirmCancel).toBeVisible();
+      await clickWithHighlight('27-confirm-cancellation', confirmCancel, 'STEP 27 - CONFIRM CANCELLATION');
+    }
+
+    await expect(page.locator('body')).toContainText(/cancelled|canceled|no booking|booking cancelled/i, {
+      timeout: 30_000,
+    });
+    await captureStep('28-booking-cancelled', page.locator('body'), 'STEP 28 - BOOKING CANCELLATION VERIFIED');
   });
 });
