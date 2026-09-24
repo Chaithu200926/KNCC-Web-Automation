@@ -39,6 +39,10 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
+        env:
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          TEST_PIN: ${{ secrets.TEST_PIN }}
         run: npm test
 
       - name: Generate screenshot dashboard
