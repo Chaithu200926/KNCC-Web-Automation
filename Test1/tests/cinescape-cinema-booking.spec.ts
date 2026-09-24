@@ -11,6 +11,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
 
   const homePage = new HomePage(page);
   let movieTitle = '';
+  let selectedShowDate = '';
   const captureStep = async (name: string, locator: Parameters<HomePage['highlight']>[0], label: string) => {
     await test.step(label, async () => {
       await homePage.highlight(locator, label);
@@ -27,7 +28,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     label: string,
   ) => {
     await captureStep(name, locator, label);
-    await locator.evaluate((element) => (element as HTMLElement).click());
+    await locator.click({ force: true });
   };
 
   const signInAfterShowtime = async () => {
@@ -83,6 +84,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await expect(date).toBeVisible();
     await clickWithHighlight('03-date', date, 'STEP 3 - CHOOSE TOMORROW');
     await expect(date).toHaveAttribute('aria-selected', 'true');
+    selectedShowDate = (await date.innerText()).replace(/\s+/g, ' ').trim();
 
     const showtimes = page.locator('.time-box:visible');
     await expect(showtimes.nth(1)).toBeVisible();
@@ -90,6 +92,21 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await clickWithHighlight('04-time', showtime, 'STEP 4 - CHOOSE TIME');
     await expect(page.locator('[role="dialog"]:visible')).toBeVisible();
     await signInAfterShowtime();
+
+    const dateAfterSignIn = page.getByRole('tab').nth(1);
+    await expect(dateAfterSignIn).toBeVisible();
+    await clickWithHighlight(
+      '10-date-after-sign-in',
+      dateAfterSignIn,
+      'STEP 10 - RESELECT TOMORROW AFTER SIGN-IN',
+    );
+    await expect(dateAfterSignIn).toHaveAttribute('aria-selected', 'true');
+    selectedShowDate = (await dateAfterSignIn.innerText()).replace(/\s+/g, ' ').trim();
+    await captureStep(
+      '10-date-selected-after-sign-in',
+      dateAfterSignIn,
+      'STEP 10A - VERIFY TOMORROW REMAINS SELECTED',
+    );
 
     const continuedShowtimes = page.locator('.time-box:visible');
     const continuedShowtime = continuedShowtimes.nth(1);
@@ -179,6 +196,15 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await confirmBooking.click();
     await expect(page).toHaveURL(/bookingconfirm\?result=success/i, { timeout: 30_000 });
     await expect(page.locator('body')).toContainText(/booking id/i);
+    const confirmationText = await page.locator('body').innerText();
+    const selectedDay = selectedShowDate.match(/\d{1,2}/)?.[0];
+    const bookedDay = confirmationText.match(/\b(\d{1,2})\s+[A-Za-z]{3,9}\s+\d{4}\b/)?.[1];
+    expect.soft(bookedDay, `Booking date should match the selected show date "${selectedShowDate}"`).toBe(selectedDay);
+    await captureStep(
+      '20-booking-date-confirmed',
+      page.locator('body'),
+      'STEP 20A - VERIFY BOOKING DATE',
+    );
   });
 
   await test.step('Open My Profile and cancel the confirmed booking', async () => {
