@@ -55,7 +55,7 @@ jobs:
           TEST_SUITE: ${{ inputs.suite || 'all' }}
         run: |
           if [ "$TEST_SUITE" = "cinema-booking" ]; then
-            npx playwright test tests/cinescape-cinema-booking.spec.ts
+            npx playwright test tests/cinescape-cinema-booking.spec.ts --retries=0
           else
             npm test
           fi

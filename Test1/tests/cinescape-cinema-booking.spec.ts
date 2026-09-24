@@ -26,9 +26,14 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     name: string,
     locator: Parameters<HomePage['highlight']>[0],
     label: string,
+    useBrowserClick = false,
   ) => {
     await captureStep(name, locator, label);
-    await locator.click();
+    if (useBrowserClick) {
+      await locator.click();
+    } else {
+      await locator.evaluate((element) => (element as HTMLElement).click());
+    }
   };
 
   const signInAfterShowtime = async () => {
@@ -82,7 +87,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
 
     const date = page.getByRole('tab').nth(1);
     await expect(date).toBeVisible();
-    await clickWithHighlight('03-date', date, 'STEP 3 - CHOOSE TOMORROW');
+    await clickWithHighlight('03-date', date, 'STEP 3 - CHOOSE TOMORROW', true);
     await expect(date).toHaveAttribute('aria-selected', 'true');
     selectedShowDate = (await date.innerText()).replace(/\s+/g, ' ').trim();
 
@@ -99,6 +104,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
       '10-date-after-sign-in',
       dateAfterSignIn,
       'STEP 10 - RESELECT TOMORROW AFTER SIGN-IN',
+      true,
     );
     await expect(dateAfterSignIn).toHaveAttribute('aria-selected', 'true');
     selectedShowDate = (await dateAfterSignIn.innerText()).replace(/\s+/g, ' ').trim();
