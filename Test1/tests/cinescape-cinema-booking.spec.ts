@@ -11,7 +11,6 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
 
   const homePage = new HomePage(page);
   let movieTitle = '';
-  let movieSessionsUrl = '';
   let selectedShowDate = '';
   let selectedShowTime = '';
   let confirmedBookingId = '';
@@ -89,7 +88,6 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
       .replace(/[-()]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    movieSessionsUrl = page.url();
   });
 
   await test.step('Choose tomorrow and the second showtime', async () => {
@@ -110,51 +108,6 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await clickWithHighlight('04-time', showtime, 'STEP 4 - CHOOSE TIME');
     await expect(page.locator('[role="dialog"]:visible')).toBeVisible();
     await signInAfterShowtime();
-
-    await test.step('Clear a matching booking left by an earlier run', async () => {
-      const titlePattern = movieTitle
-        .split(/\s+/)
-        .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-        .join('[\\s()-]*');
-      const selectedDay = selectedShowDate.match(/\d{1,2}/)?.[0];
-      const timePattern = selectedShowTime.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const priorBookingPattern = selectedDay
-        ? new RegExp(`${titlePattern}[\\s\\S]{0,180}\\b${selectedDay}\\b[\\s\\S]{0,80}${timePattern}`, 'i')
-        : new RegExp(titlePattern, 'i');
-
-      await page.goto(new URL('/myaccount', testConfig.urls.home).toString(), { waitUntil: 'domcontentloaded' });
-      const bookingsTab = page.getByText(/^bookings$/i).first();
-      await expect(bookingsTab).toBeVisible();
-      await bookingsTab.click();
-      const bookingList = page.locator('body');
-      const existingBookingsText = await bookingList.innerText();
-      if (priorBookingPattern.test(normalizeVisibleText(existingBookingsText))) {
-        await captureStep('10-prior-booking-found', bookingList, 'STEP 10 - CHECK FOR LEFTOVER BOOKING');
-        const cancelPriorBooking = page.locator('button:visible, a:visible')
-          .filter({ hasText: /cancel booking|cancel/i })
-          .first();
-        await expect(cancelPriorBooking).toBeVisible();
-        await cancelPriorBooking.click();
-        const confirmPriorCancel = page.locator('button:visible')
-          .filter({ hasText: /yes,?\s*I.?m sure|confirm|cancel booking/i })
-          .last();
-        await expect(confirmPriorCancel).toBeVisible();
-        await confirmPriorCancel.click();
-        await page.goto(new URL('/myaccount', testConfig.urls.home).toString(), { waitUntil: 'domcontentloaded' });
-        const refreshedBookingsTab = page.getByText(/^bookings$/i).first();
-        await expect(refreshedBookingsTab).toBeVisible();
-        await refreshedBookingsTab.click();
-        await expect(page.locator('body')).not.toContainText(priorBookingPattern);
-        await captureStep('10-prior-booking-cleared', page.locator('body'), 'STEP 10A - VERIFY OLD BOOKING CLEARED');
-      }
-    });
-
-    await page.goto(movieSessionsUrl, { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/moviesessions\//);
-    const experienceAfterSignIn = page.locator('#cinema0000000001, .cinemacarousal:visible')
-      .filter({ hasText: /Cinescape 360/i }).first();
-    await expect(experienceAfterSignIn).toBeVisible();
-    await experienceAfterSignIn.click();
 
     const selectedDay = selectedShowDate.match(/\d{1,2}/)?.[0];
     if (!selectedDay) throw new Error(`Could not read the selected show date from "${selectedShowDate}".`);
@@ -216,22 +169,6 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await seatProceed.scrollIntoViewIfNeeded();
     await captureStep('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP');
     await seatProceed.click();
-    const bookingsFoundDialog = page.getByRole('dialog').filter({ hasText: /bookings found/i });
-    if (await bookingsFoundDialog.isVisible().catch(() => false)) {
-      const continueBooking = bookingsFoundDialog.getByRole('button', { name: /continue booking/i });
-      await expect(continueBooking).toBeVisible();
-      await clickWithHighlight(
-        '15-existing-bookings-dialog',
-        bookingsFoundDialog,
-        'STEP 15A - EXISTING BOOKING NOTICE',
-      );
-      await clickWithHighlight(
-        '15-continue-booking',
-        continueBooking,
-        'STEP 15B - CONTINUE NEW BOOKING',
-      );
-      await expect(bookingsFoundDialog).toBeHidden({ timeout: 10_000 });
-    }
     await expect(page).toHaveURL(/\/(?:food|payment)\//, { timeout: 30_000 });
   });
 
