@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Test suite to run
+        type: choice
+        options:
+          - all
+          - cinema-booking
+        default: all
+        required: true
 
 permissions:
   contents: read
@@ -43,7 +52,13 @@ jobs:
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           TEST_PIN: ${{ secrets.TEST_PIN }}
-        run: npm test
+          TEST_SUITE: ${{ inputs.suite || 'all' }}
+        run: |
+          if [ "$TEST_SUITE" = "cinema-booking" ]; then
+            npx playwright test tests/cinescape-cinema-booking.spec.ts
+          else
+            npm test
+          fi
 
       - name: Generate screenshot dashboard
         if: always()
