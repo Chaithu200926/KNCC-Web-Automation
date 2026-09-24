@@ -184,7 +184,6 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
         'STEP 15B - CONTINUE NEW BOOKING',
       );
       await expect(bookingsFoundDialog).toBeHidden({ timeout: 10_000 });
-      await seatProceed.click();
     }
     await expect(page).toHaveURL(/\/(?:food|payment)\//, { timeout: 30_000 });
   });
