@@ -57,6 +57,7 @@ function collectSuite(suite, ancestors = []) {
         '14-seat': 'STEP 14 - CHOOSE AVAILABLE SEAT',
         '15-seat-proceed': 'STEP 15 - PROCEED FROM SEAT MAP',
         '17-food-proceed': 'STEP 17 - CONTINUE WITHOUT FOOD',
+        '17-food-skipped': 'STEP 17 - FOOD STEP ALREADY SKIPPED',
         '18-open-wallet': 'STEP 18 - OPEN WALLET PAYMENT',
         '19-wallet-apply': 'STEP 19 - APPLY WALLET BALANCE',
         '20-confirm-booking': 'STEP 20 - CONFIRM BOOKING',

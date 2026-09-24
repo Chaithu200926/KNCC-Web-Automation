@@ -12,6 +12,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
   const homePage = new HomePage(page);
   let movieTitle = '';
   let selectedShowDate = '';
+  let selectedShowTime = '';
   const captureStep = async (name: string, locator: Parameters<HomePage['highlight']>[0], label: string) => {
     await test.step(label, async () => {
       await homePage.highlight(locator, label);
@@ -94,11 +95,14 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const showtimes = page.locator('.time-box:visible');
     await expect(showtimes.nth(1)).toBeVisible();
     const showtime = showtimes.nth(1);
+    selectedShowTime = (await showtime.innerText()).replace(/\s+/g, ' ').trim();
     await clickWithHighlight('04-time', showtime, 'STEP 4 - CHOOSE TIME');
     await expect(page.locator('[role="dialog"]:visible')).toBeVisible();
     await signInAfterShowtime();
 
-    const dateAfterSignIn = page.getByRole('tab').nth(1);
+    const selectedDay = selectedShowDate.match(/\d{1,2}/)?.[0];
+    if (!selectedDay) throw new Error(`Could not read the selected show date from "${selectedShowDate}".`);
+    const dateAfterSignIn = page.getByRole('tab').filter({ hasText: selectedDay }).first();
     await expect(dateAfterSignIn).toBeVisible();
     await clickWithHighlight(
       '10-date-after-sign-in',
@@ -117,6 +121,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const continuedShowtimes = page.locator('.time-box:visible');
     const continuedShowtime = continuedShowtimes.nth(1);
     await expect(continuedShowtime).toBeVisible();
+    await expect(continuedShowtime).toHaveText(selectedShowTime);
     await continuedShowtime.click({ force: true });
     await expect(page.locator('body')).toContainText(/Select Seat Category/i, { timeout: 15_000 });
   });
@@ -157,10 +162,15 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await seatProceed.scrollIntoViewIfNeeded();
     await captureStep('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP');
     await seatProceed.click();
-    await expect(page).toHaveURL(/\/food\//, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/(?:food|payment)\//, { timeout: 30_000 });
   });
 
   await test.step('Skip food and continue to payment', async () => {
+    if (/\/payment\//.test(page.url())) {
+      await expect(page.getByRole('heading', { name: /select payment method/i })).toBeVisible();
+      await captureStep('17-food-skipped', page.locator('body'), 'STEP 17 - FOOD STEP ALREADY SKIPPED');
+      return;
+    }
     const foodProceed = page.getByRole('button', { name: /skip\s*(?:&|and)\s*proceed/i }).last();
     await expect(foodProceed).toBeVisible();
     await expect(foodProceed).toBeEnabled();
