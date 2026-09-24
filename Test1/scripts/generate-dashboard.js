@@ -41,6 +41,30 @@ function collectSuite(suite, ancestors = []) {
       const snapshots = writeSnapshots(result.attachments, tests.length);
       const steps = flattenSteps(result.steps);
       const snapshotStepMap = {
+        '01-movie-book-now': 'Open any movie and click Book Now',
+        '02-experience': 'Choose tomorrow and the second showtime',
+        '03-date': 'Choose tomorrow and the second showtime',
+        '04-time': 'Choose tomorrow and the second showtime',
+        '06-login-form': 'Choose tomorrow and the second showtime',
+        '07-submit-sign-in': 'Choose tomorrow and the second showtime',
+        '08-email-otp-form': 'Choose tomorrow and the second showtime',
+        '09-submit-email-otp': 'Choose tomorrow and the second showtime',
+        '11-seat-category': 'Choose seat category and ticket type',
+        '12-seat-type': 'Choose seat category and ticket type',
+        '13-ticket-proceed': 'Choose a seat and proceed',
+        '14-seat': 'Choose a seat and proceed',
+        '15-seat-proceed': 'Choose a seat and proceed',
+        '17-food-proceed': 'Skip food and continue to payment',
+        '18-open-wallet': 'Apply wallet and confirm booking',
+        '19-wallet-apply': 'Apply wallet and confirm booking',
+        '20-confirm-booking': 'Apply wallet and confirm booking',
+        '21-my-profile': 'Open My Profile and cancel the confirmed booking',
+        '22-my-profile': 'Open My Profile and cancel the confirmed booking',
+        '23-bookings': 'Open My Profile and cancel the confirmed booking',
+        '24-booking-found': 'Open My Profile and cancel the confirmed booking',
+        '25-cancel-booking': 'Open My Profile and cancel the confirmed booking',
+        '26-confirm-cancellation': 'Open My Profile and cancel the confirmed booking',
+        '27-booking-cancelled': 'Open My Profile and cancel the confirmed booking',
         '01-home-page-loaded': 'Verify the home page is ready',
         '02-book-now-selected-before-click': 'Open the first movie session',
         '03-date-and-time-selection-loaded': 'Verify date and time selection is available',
@@ -74,7 +98,7 @@ function collectSuite(suite, ancestors = []) {
           }
         }
         const targetTitle = snapshotStepMap[snapshot.name] || footerTitle;
-        const targetStep = steps.find((step) => step.title === targetTitle);
+        const targetStep = steps.find((step) => step.title.endsWith(targetTitle));
         if (targetStep) {
           targetStep.snapshots = [...(targetStep.snapshots || []), snapshot];
         }
