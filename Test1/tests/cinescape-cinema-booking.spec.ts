@@ -92,7 +92,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
       .trim();
   });
 
-  await test.step('Choose tomorrow and the second showtime', async () => {
+  await test.step('Choose tomorrow and a showtime on that calendar day', async () => {
     const experience = page.locator('#cinema0000000001, .cinemacarousal:visible').filter({ hasText: /Cinescape 360/i }).first();
     await expect(experience).toBeVisible();
     await clickWithHighlight('02-experience', experience, 'STEP 2 - CHOOSE CINESCAPE 360 EXPERIENCE');
@@ -104,8 +104,29 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     selectedShowDate = (await date.innerText()).replace(/\s+/g, ' ').trim();
 
     const showtimes = page.locator('.time-box:visible');
-    await expect(showtimes.nth(1)).toBeVisible();
-    const showtime = showtimes.nth(1);
+    await expect(showtimes.first()).toBeVisible();
+    const showtimeCount = await showtimes.count();
+    const preferredIndexes = [1, 2];
+    let showtime = showtimes.first();
+    let selectedClockHour = -1;
+    for (const index of preferredIndexes) {
+      if (index >= showtimeCount) continue;
+      const candidate = showtimes.nth(index);
+      const timeText = (await candidate.innerText()).replace(/\s+/g, ' ').trim();
+      const hour = Number(timeText.match(/\b(\d{1,2}):\d{2}\b/)?.[1]);
+      if (Number.isFinite(hour) && hour >= 6 && hour < 24) {
+        showtime = candidate;
+        selectedClockHour = hour;
+        break;
+      }
+    }
+    if (selectedClockHour < 0) {
+      const firstShowtimeText = (await showtime.innerText()).replace(/\s+/g, ' ').trim();
+      selectedClockHour = Number(firstShowtimeText.match(/\b(\d{1,2}):\d{2}\b/)?.[1]);
+    }
+    if (!Number.isFinite(selectedClockHour) || selectedClockHour < 6) {
+      throw new Error('No showtime on the selected calendar day is available; the listed times are after midnight.');
+    }
     selectedShowTime = (await showtime.innerText()).replace(/\s+/g, ' ').trim();
     await clickWithHighlight('04-time', showtime, 'STEP 4 - CHOOSE TIME');
     await expect(page.locator('[role="dialog"]:visible')).toBeVisible();
@@ -237,7 +258,10 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await expect(confirmedDateTime).toBeVisible();
     const confirmedDateTimeText = normalizeVisibleText(await confirmedDateTime.innerText());
     const bookedDay = confirmedDateTimeText.match(/^(\d{1,2})\b/)?.[1];
-    confirmedBookingId = normalizedConfirmationText.match(/booking\s*id\s*[:#]?\s*([A-Z0-9]{4,})/i)?.[1] ?? '';
+    const bookingIdLabel = page.getByText('Booking ID', { exact: true }).first();
+    const bookingIdValue = bookingIdLabel.locator('..').getByRole('heading').first();
+    await expect(bookingIdValue).toBeVisible();
+    confirmedBookingId = normalizeVisibleText(await bookingIdValue.innerText());
     expect(bookedDay, `Booking date should match the selected show date "${selectedShowDate}"`).toBe(selectedDay);
     expect(confirmedBookingId, 'The confirmation page should show a booking ID').not.toBe('');
     if (!bookedDay) {
@@ -279,8 +303,18 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
 
     const confirmCancel = page.locator('button:visible').filter({ hasText: /yes,?\s*I.?m sure|confirm|cancel booking/i }).last();
     await expect(confirmCancel).toBeVisible({ timeout: 10_000 });
+    const cancellationResponsePromise = page.waitForResponse((response) => {
+      const requestUrl = new URL(response.url());
+      return requestUrl.pathname === '/api/content/trans/cancelbooking'
+        && response.request().method() === 'POST';
+    }, { timeout: 30_000 });
     await clickWithHighlight('26-confirm-cancellation', confirmCancel, 'STEP 26 - CONFIRM CANCELLATION');
-    await page.goto(new URL('/myaccount', testConfig.urls.home).toString(), { waitUntil: 'domcontentloaded' });
+    const cancellationResponse = await cancellationResponsePromise;
+    expect(cancellationResponse.ok(), 'The booking cancellation request should succeed').toBeTruthy();
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 });
+    const profileAfterCancellation = page.locator('a[href="/myaccount"]').first();
+    await expect(profileAfterCancellation).toBeVisible();
+    await profileAfterCancellation.click();
     await expect(page).toHaveURL(/\/myaccount/);
     const bookingsAfterCancellation = page.getByText(/^bookings$/i).first();
     await expect(bookingsAfterCancellation).toBeVisible();
