@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { HomePage } from '../pages/HomePage';
 
@@ -46,6 +47,15 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     }
   };
 
+  const hideInputValueInVideo = async (input: Locator) => {
+    await input.evaluate((element) => {
+      const field = element as HTMLInputElement;
+      field.style.setProperty('color', 'transparent', 'important');
+      field.style.setProperty('text-shadow', 'none', 'important');
+      field.style.setProperty('caret-color', 'transparent', 'important');
+    });
+  };
+
   const signInAfterShowtime = async () => {
     const loginDialog = page.locator('[role="dialog"]:visible').last();
     const emailInput = loginDialog.locator('input[name="email"], input[type="email"]').first();
@@ -53,6 +63,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
 
     await expect(emailInput).toBeVisible();
     await captureStep('06-login-form', emailInput, 'STEP 6 - SIGN-IN FORM');
+    await hideInputValueInVideo(emailInput);
     await emailInput.fill(testConfig.credentials.username);
     await passwordInput.fill(testConfig.credentials.password);
 
@@ -63,6 +74,9 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const otpInputs = otpDialog.locator('input[type="tel"]');
     await expect(otpInputs.first()).toBeVisible();
     await captureStep('08-email-otp-form', otpInputs.first(), 'STEP 8 - ENTER EMAIL OTP');
+    for (let index = 0; index < await otpInputs.count(); index += 1) {
+      await hideInputValueInVideo(otpInputs.nth(index));
+    }
 
     const otp = testConfig.credentials.pin;
     if (await otpInputs.count() >= otp.length) {

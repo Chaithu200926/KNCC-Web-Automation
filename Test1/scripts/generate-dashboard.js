@@ -33,12 +33,31 @@ function writeSnapshots(attachments, testIndex) {
     });
 }
 
+function writeVideos(attachments, testIndex) {
+  return (attachments || [])
+    .filter((attachment) => attachment.contentType?.startsWith('video/') && attachment.path)
+    .map((attachment, videoIndex) => {
+      if (!fs.existsSync(attachment.path)) return null;
+      const extension = path.extname(attachment.path) || '.webm';
+      const fileName = `test-${testIndex + 1}-video-${videoIndex + 1}${extension}`;
+      fs.mkdirSync(assetDir, { recursive: true });
+      fs.copyFileSync(attachment.path, path.join(assetDir, fileName));
+      return {
+        name: attachment.name || 'Test video',
+        contentType: attachment.contentType,
+        path: `assets/${fileName}`,
+      };
+    })
+    .filter(Boolean);
+}
+
 function collectSuite(suite, ancestors = []) {
   for (const spec of suite.specs || []) {
     for (const test of spec.tests || []) {
       const result = test.results?.[test.results.length - 1] || {};
       const status = result.status || test.status || 'unknown';
       const snapshots = writeSnapshots(result.attachments, tests.length);
+      const videos = writeVideos(result.attachments, tests.length);
       const steps = flattenSteps(result.steps);
       const snapshotStepMap = {
         '01-movie-book-now': 'STEP 1 - CLICK BOOK NOW',
@@ -114,6 +133,7 @@ function collectSuite(suite, ancestors = []) {
         browser: test.projectName || 'unknown',
         error: result.error?.message || '',
         steps,
+        videos,
       });
     }
   }
@@ -140,7 +160,7 @@ const generatedAt = new Date().toISOString();
 
 const rows = tests.map((test) => `
   <tr>
-    <td><strong>${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}<details><summary>View ${test.steps.length} execution steps</summary><ol class="steps">${test.steps.map((step) => `<li><span class="step-status ${step.status}">${step.status}</span><span>${safe(step.title)}${(step.snapshots || []).map((snapshot) => `<img class="snapshot" src="${snapshot.path}" alt="${safe(snapshot.name)} snapshot">`).join('')}</span><time>${(step.duration / 1000).toFixed(2)}s</time>${step.error ? `<small>${safe(step.error)}</small>` : ''}</li>`).join('')}</ol></details></td>
+    <td><strong class="test-name">${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}${test.videos.map((video) => `<details class="video-details"><summary>Watch ${test.name.toLowerCase().includes('booking') ? 'transaction' : 'test'} video</summary><video class="test-video" controls preload="metadata"><source src="${video.path}" type="${safe(video.contentType)}">Your browser does not support WebM video.</video></details>`).join('')}<details><summary>View ${test.steps.length} execution steps</summary><ol class="steps">${test.steps.map((step) => `<li><span class="step-status ${step.status}">${step.status}</span><span>${safe(step.title)}${(step.snapshots || []).map((snapshot) => `<img class="snapshot" src="${snapshot.path}" alt="${safe(snapshot.name)} snapshot">`).join('')}</span><time>${(step.duration / 1000).toFixed(2)}s</time>${step.error ? `<small>${safe(step.error)}</small>` : ''}</li>`).join('')}</ol></details></td>
     <td><span class="status ${safe(test.status)}">${safe(test.status)}</span></td>
     <td>${safe(test.browser)}</td>
     <td>${(test.duration / 1000).toFixed(2)}s</td>
@@ -159,7 +179,7 @@ main { max-width:1180px; margin:auto; padding:42px 24px 64px; } header { display
 .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:18px; } .card { background:rgba(24,38,49,.92); border:1px solid var(--line); border-radius:10px; padding:20px; } .metric { font-size:32px; font-weight:750; } .metric-label { color:var(--muted); }
 .content { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; } .chart { display:flex; gap:28px; align-items:center; } .donut { width:150px; aspect-ratio:1; border-radius:50%; background:conic-gradient(var(--green) ${passRate}%, var(--red) ${passRate}% ${Math.min(100, passRate + (total ? failed / total * 100 : 0))}%, var(--amber) 0); display:grid; place-items:center; } .donut:after { content:'${passRate}%'; width:102px; aspect-ratio:1; border-radius:50%; background:var(--panel); display:grid; place-items:center; font-size:24px; font-weight:700; } .legend { display:grid; gap:9px; } .key { display:flex; gap:9px; align-items:center; } .dot { width:10px; height:10px; border-radius:50%; background:var(--green); } .dot.fail { background:var(--red); } .dot.skip { background:var(--amber); }
 .bars { display:grid; gap:14px; } .bar-row { display:grid; grid-template-columns:90px 1fr 35px; gap:10px; align-items:center; } .track { background:#0e171d; height:12px; border-radius:20px; overflow:hidden; } .fill { height:100%; background:var(--green); border-radius:20px; } .fill.fail { background:var(--red); } .fill.skip { background:var(--amber); }
-table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:14px 12px; border-bottom:1px solid var(--line); vertical-align:top; } th { color:var(--muted); font-weight:600; } td small { display:block; color:var(--red); margin-top:4px; word-break:break-word; } details { margin-top:12px; } summary { color:var(--cyan); cursor:pointer; font-size:13px; } .steps { margin:10px 0 0 18px; padding:0; display:grid; gap:12px; } .steps li { display:grid; grid-template-columns:62px 1fr auto; gap:8px; align-items:start; color:var(--muted); } .steps time { color:var(--muted); white-space:nowrap; } .step-status { font-size:10px; text-transform:uppercase; color:var(--green); } .step-status.failed { color:var(--red); } .snapshot { display:block; width:min(100%,520px); margin-top:8px; border:1px solid var(--line); border-radius:6px; } .status { display:inline-block; padding:3px 9px; border-radius:20px; background:#244434; color:var(--green); font-size:12px; text-transform:uppercase; } .status.failed,.status.timedOut { background:#512c32; color:var(--red); } .status.skipped { background:#554621; color:var(--amber); } footer { margin-top:20px; color:var(--muted); font-size:13px; }
+table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:14px 12px; border-bottom:1px solid var(--line); vertical-align:top; } th { color:var(--muted); font-weight:600; } td small { display:block; color:var(--red); margin-top:4px; word-break:break-word; } .test-name { display:block; font-size:16px; } details { margin-top:12px; } summary { color:var(--cyan); cursor:pointer; font-size:13px; } .test-video { display:block; width:min(100%,720px); margin-top:10px; border:1px solid var(--line); border-radius:8px; background:#000; } .steps { margin:10px 0 0 18px; padding:0; display:grid; gap:12px; } .steps li { display:grid; grid-template-columns:62px 1fr auto; gap:8px; align-items:start; color:var(--muted); } .steps time { color:var(--muted); white-space:nowrap; } .step-status { font-size:10px; text-transform:uppercase; color:var(--green); } .step-status.failed { color:var(--red); } .snapshot { display:block; width:min(100%,520px); margin-top:8px; border:1px solid var(--line); border-radius:6px; } .status { display:inline-block; padding:3px 9px; border-radius:20px; background:#244434; color:var(--green); font-size:12px; text-transform:uppercase; } .status.failed,.status.timedOut { background:#512c32; color:var(--red); } .status.skipped { background:#554621; color:var(--amber); } footer { margin-top:20px; color:var(--muted); font-size:13px; }
 @media (max-width:760px) { header,.content { display:block; } header > div:last-child { margin-top:12px; } .grid { grid-template-columns:repeat(2,1fr); } .card { margin-bottom:16px; } .chart { justify-content:center; margin-bottom:12px; } table { font-size:13px; } th:nth-child(3),td:nth-child(3) { display:none; } }
 </style>
 </head>
@@ -175,8 +195,8 @@ table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding
   <div class="card"><h2>Outcome</h2><div class="chart"><div class="donut"></div><div class="legend"><div class="key"><span class="dot"></span>Passed: ${passed}</div><div class="key"><span class="dot fail"></span>Failed: ${failed}</div><div class="key"><span class="dot skip"></span>Skipped: ${skipped}</div></div></div></div>
   <div class="card"><h2>Test distribution</h2><div class="bars"><div class="bar-row"><span>Passed</span><div class="track"><div class="fill" style="width:${barWidth(passed)}%"></div></div><strong>${passed}</strong></div><div class="bar-row"><span>Failed</span><div class="track"><div class="fill fail" style="width:${barWidth(failed)}%"></div></div><strong>${failed}</strong></div><div class="bar-row"><span>Skipped</span><div class="track"><div class="fill skip" style="width:${barWidth(skipped)}%"></div></div><strong>${skipped}</strong></div></div></div>
 </section>
-<section class="card"><h2>Test details</h2><table><thead><tr><th>Test</th><th>Status</th><th>Browser</th><th>Duration</th></tr></thead><tbody>${rows || '<tr><td colspan="4">No tests found</td></tr>'}</tbody></table></section>
-<footer>Generated from Playwright JSON results. Screenshots are shown with their verification steps.</footer>
+<section class="card"><h2>Test details · ${total} individual specs</h2><table><thead><tr><th>Test</th><th>Status</th><th>Browser</th><th>Duration</th></tr></thead><tbody>${rows || '<tr><td colspan="4">No tests found</td></tr>'}</tbody></table></section>
+<footer>Generated from Playwright JSON results. Screenshots and test videos are bundled with the dashboard.</footer>
 </main></body></html>`;
 
 fs.mkdirSync(outputDir, { recursive: true });
