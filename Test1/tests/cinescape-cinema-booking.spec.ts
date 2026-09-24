@@ -12,10 +12,12 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
   const homePage = new HomePage(page);
   let movieTitle = '';
   const captureStep = async (name: string, locator: Parameters<HomePage['highlight']>[0], label: string) => {
-    await homePage.highlight(locator, label);
-    await testInfo.attach(name, {
-      body: await page.screenshot({ fullPage: true }),
-      contentType: 'image/png',
+    await test.step(label, async () => {
+      await homePage.highlight(locator, label);
+      await testInfo.attach(name, {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+      });
     });
   };
 
