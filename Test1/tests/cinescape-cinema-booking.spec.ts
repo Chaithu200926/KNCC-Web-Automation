@@ -169,6 +169,23 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await seatProceed.scrollIntoViewIfNeeded();
     await captureStep('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP');
     await seatProceed.click();
+    const bookingsFoundDialog = page.getByRole('dialog').filter({ hasText: /bookings found/i });
+    if (await bookingsFoundDialog.isVisible().catch(() => false)) {
+      const continueBooking = bookingsFoundDialog.getByRole('button', { name: /continue booking/i });
+      await expect(continueBooking).toBeVisible();
+      await clickWithHighlight(
+        '15-existing-bookings-dialog',
+        bookingsFoundDialog,
+        'STEP 15A - EXISTING BOOKING NOTICE',
+      );
+      await clickWithHighlight(
+        '15-continue-booking',
+        continueBooking,
+        'STEP 15B - CONTINUE NEW BOOKING',
+      );
+      await expect(bookingsFoundDialog).toBeHidden({ timeout: 10_000 });
+      await seatProceed.click();
+    }
     await expect(page).toHaveURL(/\/(?:food|payment)\//, { timeout: 30_000 });
   });
 
