@@ -292,13 +292,18 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await expect(page.locator('body')).toContainText(/booking id/i);
     const confirmationText = await page.locator('body').innerText();
     const normalizedConfirmationText = normalizeVisibleText(confirmationText);
-    const bookedDay = readBookedDay(normalizedConfirmationText);
+    const confirmedDateTime = page.getByRole('heading', {
+      name: /^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s*\|\s*\d{1,2}:\d{2}$/,
+    }).first();
+    await expect(confirmedDateTime).toBeVisible();
+    const confirmedDateTimeText = normalizeVisibleText(await confirmedDateTime.innerText());
+    const bookedDay = confirmedDateTimeText.match(/^(\d{1,2})\b/)?.[1];
     confirmedBookingId = normalizedConfirmationText.match(/booking\s*id\s*[:#]?\s*([A-Z0-9]{4,})/i)?.[1] ?? '';
     expect(bookedDay, `Booking date should match the selected show date "${selectedShowDate}"`).toBe(selectedDay);
     expect(confirmedBookingId, 'The confirmation page should show a booking ID').not.toBe('');
     if (!bookedDay) {
       await testInfo.attach('booking-confirmation-visible-text', {
-        body: normalizedConfirmationText,
+        body: `${confirmedDateTimeText}\n\n${normalizedConfirmationText}`,
         contentType: 'text/plain',
       });
     }
