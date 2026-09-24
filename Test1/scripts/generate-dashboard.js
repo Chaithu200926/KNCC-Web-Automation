@@ -45,17 +45,17 @@ function writeVideos(attachments, testIndex) {
   const attachment = (attachments || []).find(
     (item) => item.contentType?.startsWith('video/') && item.path && fs.existsSync(item.path),
   );
-  if (!attachment) return [];
+  if (!attachment) return null;
 
   const extension = path.extname(attachment.path) || '.webm';
-  const fileName = `test-${testIndex + 1}-transaction${extension}`;
+  const fileName = `test-${testIndex + 1}-video${extension}`;
   fs.mkdirSync(assetDir, { recursive: true });
   fs.copyFileSync(attachment.path, path.join(assetDir, fileName));
-  return [{
+  return {
     name: attachment.name || 'Transaction video',
     contentType: attachment.contentType,
     path: `assets/${fileName}`,
-  }];
+  };
 }
 
 function collectSuite(suite, ancestors = []) {
@@ -64,9 +64,7 @@ function collectSuite(suite, ancestors = []) {
       const result = test.results?.[test.results.length - 1] || {};
       const status = result.status || test.status || 'unknown';
       const snapshots = writeSnapshots(result.attachments, tests.length);
-      const videos = /cinema booking/i.test(spec.title)
-        ? writeVideos(result.attachments, tests.length)
-        : [];
+      const video = writeVideos(result.attachments, tests.length);
       const steps = flattenSteps(result.steps);
       const snapshotStepMap = {
         '01-movie-book-now': 'STEP 1 - CLICK BOOK NOW',
@@ -142,7 +140,7 @@ function collectSuite(suite, ancestors = []) {
         browser: test.projectName || 'unknown',
         error: result.error?.message || '',
         steps,
-        videos,
+        video,
       });
     }
   }
@@ -169,7 +167,7 @@ const generatedAt = new Date().toISOString();
 
 const rows = tests.map((test) => `
   <tr>
-    <td><strong class="test-name">${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}${test.videos.map((video) => `<details class="video-details"><summary>Watch ${test.name.toLowerCase().includes('booking') ? 'transaction' : 'test'} video</summary><video class="test-video" controls preload="metadata"><source src="${video.path}" type="${safe(video.contentType)}">Your browser does not support WebM video.</video></details>`).join('')}<details><summary>View ${test.steps.length} execution steps</summary><ol class="steps">${test.steps.map((step) => `<li><span class="step-status ${step.status}">${step.status}</span><span>${safe(step.title)}${(step.snapshots || []).map((snapshot) => `<img class="snapshot" src="${snapshot.path}" alt="${safe(snapshot.name)} snapshot">`).join('')}</span><time>${(step.duration / 1000).toFixed(2)}s</time>${step.error ? `<small>${safe(step.error)}</small>` : ''}</li>`).join('')}</ol></details></td>
+    <td><strong class="test-name">${safe(test.name)}</strong>${test.error ? `<small>${safe(test.error)}</small>` : ''}${test.video ? `<details class="video-details"><summary>Watch ${test.name.toLowerCase().includes('booking') ? 'transaction' : 'test'} video</summary><video class="test-video" controls preload="metadata"><source src="${test.video.path}" type="${safe(test.video.contentType)}">Your browser does not support WebM video.</video></details>` : ''}<details><summary>View ${test.steps.length} execution steps</summary><ol class="steps">${test.steps.map((step) => `<li><span class="step-status ${step.status}">${step.status}</span><span>${safe(step.title)}${(step.snapshots || []).map((snapshot) => `<img class="snapshot" src="${snapshot.path}" alt="${safe(snapshot.name)} snapshot">`).join('')}</span><time>${(step.duration / 1000).toFixed(2)}s</time>${step.error ? `<small>${safe(step.error)}</small>` : ''}</li>`).join('')}</ol></details></td>
     <td><span class="status ${safe(test.status)}">${safe(test.status)}</span></td>
     <td>${safe(test.browser)}</td>
     <td>${(test.duration / 1000).toFixed(2)}s</td>

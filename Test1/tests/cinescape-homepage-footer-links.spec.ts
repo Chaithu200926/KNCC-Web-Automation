@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 import { HomePage } from '../pages/HomePage';
 
-test.use({ video: 'off' });
+test.use({ launchOptions: { slowMo: 200 } });
 
 test('Homepage footer links navigation validation', async ({ page, testConfig }, testInfo) => {
   test.setTimeout(180_000);
@@ -73,14 +73,19 @@ test('Homepage footer links navigation validation', async ({ page, testConfig },
       const popupPromise = page.waitForEvent('popup');
       await link.click();
       const popup = await popupPromise;
-      await popup.waitForLoadState('domcontentloaded').catch(() => undefined);
-      const expectedHost = href.includes('twitter.com') ? '(?:twitter\\.com|x\\.com)' : escapeRegExp(new URL(href).hostname);
-      await expect(popup).toHaveURL(new RegExp(expectedHost));
-      await testInfo.attach(`footer-${String(step).padStart(2, '0')}-${slug(section)}-${slug(linkName)}-landed`, {
-        body: await popup.screenshot({ fullPage: true }),
-        contentType: 'image/png',
-      });
-      await popup.close();
+      const popupVideo = popup.video();
+      try {
+        await popup.waitForLoadState('domcontentloaded').catch(() => undefined);
+        const expectedHost = href.includes('twitter.com') ? '(?:twitter\\.com|x\\.com)' : escapeRegExp(new URL(href).hostname);
+        await expect(popup).toHaveURL(new RegExp(expectedHost));
+        await testInfo.attach(`footer-${String(step).padStart(2, '0')}-${slug(section)}-${slug(linkName)}-landed`, {
+          body: await popup.screenshot({ fullPage: true }),
+          contentType: 'image/png',
+        });
+      } finally {
+        await popup.close();
+        await popupVideo?.delete();
+      }
       await returnHome(step, linkName, `${section} ${linkName}`);
     });
   };
