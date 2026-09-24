@@ -136,30 +136,45 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
   await test.step('Skip food and continue to payment', async () => {
     const foodProceed = page.getByRole('button', { name: /skip\s*(?:&|and)\s*proceed/i }).last();
     await expect(foodProceed).toBeVisible();
+    await expect(foodProceed).toBeEnabled();
     await clickWithHighlight('17-food-proceed', foodProceed, 'STEP 17 - CONTINUE WITHOUT FOOD');
-    await expect(page).toHaveURL(/\/payment\//);
-
+    await expect(page).toHaveURL(/\/payment\//, { timeout: 15_000 });
   });
 
   await test.step('Apply wallet and confirm booking', async () => {
+    await expect(page.getByRole('heading', { name: /select payment method/i })).toBeVisible({ timeout: 15_000 });
     const walletAccordion = page.getByRole('button', { name: /use your wallet/i }).last();
+    const walletApply = page.getByRole('button', { name: /^apply$/i }).first();
+    const walletRemove = page.getByRole('button', { name: /^remove$/i }).first();
     await expect(walletAccordion).toBeVisible();
     await walletAccordion.scrollIntoViewIfNeeded();
-    await clickWithHighlight('18-open-wallet', walletAccordion, 'STEP 18 - OPEN WALLET PAYMENT');
-    await page.locator('body').press('End');
-    await page.waitForTimeout(500);
-    const removeWallet = page.getByRole('button', { name: /^remove$/i }).first();
-    const alreadyApplied = await removeWallet.isVisible().catch(() => false);
-    if (!alreadyApplied) {
-      const walletApply = page.getByRole('button', { name: /^apply$/i }).first();
+
+    let walletAlreadyApplied = await walletRemove.isVisible().catch(() => false);
+    const walletOptionsOpen = await walletApply.isVisible().catch(() => false) || walletAlreadyApplied;
+    if (!walletOptionsOpen) {
+      await clickWithHighlight('18-open-wallet', walletAccordion, 'STEP 18 - OPEN WALLET PAYMENT');
+      await expect.poll(async () =>
+        (await walletApply.isVisible().catch(() => false)) ||
+        (await walletRemove.isVisible().catch(() => false)),
+      { timeout: 10_000 }).toBe(true);
+      walletAlreadyApplied = await walletRemove.isVisible().catch(() => false);
+    }
+
+    if (!walletAlreadyApplied) {
       await expect(walletApply).toBeVisible();
-      await clickWithHighlight('19-wallet-apply', walletApply, 'STEP 19 - APPLY WALLET BALANCE');
+      await walletApply.scrollIntoViewIfNeeded();
+      await captureStep('19-wallet-apply', walletApply, 'STEP 19 - APPLY WALLET BALANCE');
+      await walletApply.click();
+      await expect(walletRemove).toBeVisible({ timeout: 15_000 });
     }
     await expect(page.locator('body')).toContainText(/wallet applied/i);
 
     const confirmBooking = page.getByRole('button', { name: 'Proceed', exact: true }).last();
     await expect(confirmBooking).toBeVisible();
-    await clickWithHighlight('20-confirm-booking', confirmBooking, 'STEP 20 - CONFIRM BOOKING');
+    await expect(confirmBooking).toBeEnabled();
+    await confirmBooking.scrollIntoViewIfNeeded();
+    await captureStep('20-confirm-booking', confirmBooking, 'STEP 20 - CONFIRM BOOKING');
+    await confirmBooking.click();
     await expect(page).toHaveURL(/bookingconfirm\?result=success/i, { timeout: 30_000 });
     await expect(page.locator('body')).toContainText(/booking id/i);
   });
