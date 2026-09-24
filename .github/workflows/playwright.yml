@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Test suite to run
+        required: true
+        type: choice
+        options:
+          - all
+          - cinema-booking
+        default: all
 
 permissions:
   contents: read
@@ -39,7 +48,17 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: npm test
+        env:
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          TEST_PIN: ${{ secrets.TEST_PIN }}
+          TEST_SUITE: ${{ inputs.suite || 'all' }}
+        run: |
+          if [ "$TEST_SUITE" = "cinema-booking" ]; then
+            npx playwright test tests/cinescape-cinema-booking.spec.ts
+          else
+            npm test
+          fi
 
       - name: Generate visual dashboard
         if: always()
