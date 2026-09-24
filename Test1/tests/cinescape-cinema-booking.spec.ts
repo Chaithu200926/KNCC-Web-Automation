@@ -76,6 +76,8 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const submitOtp = otpDialog.getByRole('button', { name: /submit|verify|continue/i }).last();
     await clickWithHighlight('09-submit-email-otp', submitOtp, 'STEP 9 - VERIFY EMAIL OTP');
     await expect(otpDialog).toBeHidden({ timeout: 30_000 });
+    const signedInProfileLink = page.locator('a[href="/myaccount"], nav.header-nav .user-profile:visible').first();
+    await expect(signedInProfileLink).toBeVisible({ timeout: 30_000 });
   };
 
   await test.step('Open any movie and click Book Now', async () => {
