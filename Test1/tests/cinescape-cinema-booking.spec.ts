@@ -13,6 +13,15 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
   let movieTitle = '';
   let selectedShowDate = '';
   let selectedShowTime = '';
+  let confirmedBookingId = '';
+  const normalizeVisibleText = (text: string) => text
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+    .replace(/\u00A0/g, ' ');
+  const readBookedDay = (text: string) => {
+    const dateAndTimeText = normalizeVisibleText(text).match(/date\s*(?:&|and)\s*time[\s\S]{0,100}?\b(\d{1,2})\s+[A-Za-z]{3,9}\b/i)?.[1];
+    return dateAndTimeText;
+  };
   const captureStep = async (name: string, locator: Parameters<HomePage['highlight']>[0], label: string) => {
     await test.step(label, async () => {
       await homePage.highlight(locator, label);
@@ -178,6 +187,12 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
 
   await test.step('Apply wallet and confirm booking', async () => {
     await expect(page.getByRole('heading', { name: /select payment method/i })).toBeVisible({ timeout: 15_000 });
+    const selectedDay = selectedShowDate.match(/\d{1,2}/)?.[0];
+    if (!selectedDay) throw new Error(`Could not read the selected show date from "${selectedShowDate}".`);
+    const paymentSummary = await page.locator('body').innerText();
+    const paymentDay = readBookedDay(paymentSummary);
+    expect(paymentDay, 'Payment summary should show the date selected for this booking').toBe(selectedDay);
+
     const walletAccordion = page.getByRole('button', { name: /use your wallet/i }).last();
     const walletApply = page.getByRole('button', { name: /^apply$/i }).first();
     const walletRemove = page.getByRole('button', { name: /^remove$/i }).first();
@@ -213,9 +228,17 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await expect(page).toHaveURL(/bookingconfirm\?result=success/i, { timeout: 30_000 });
     await expect(page.locator('body')).toContainText(/booking id/i);
     const confirmationText = await page.locator('body').innerText();
-    const selectedDay = selectedShowDate.match(/\d{1,2}/)?.[0];
-    const bookedDay = confirmationText.match(/\b(\d{1,2})\s+[A-Za-z]{3,9}\s+\d{4}\b/)?.[1];
-    expect.soft(bookedDay, `Booking date should match the selected show date "${selectedShowDate}"`).toBe(selectedDay);
+    const normalizedConfirmationText = normalizeVisibleText(confirmationText);
+    const bookedDay = readBookedDay(normalizedConfirmationText);
+    confirmedBookingId = normalizedConfirmationText.match(/booking\s*id\s*[:#]?\s*([A-Z0-9]{4,})/i)?.[1] ?? '';
+    expect(bookedDay, `Booking date should match the selected show date "${selectedShowDate}"`).toBe(selectedDay);
+    expect(confirmedBookingId, 'The confirmation page should show a booking ID').not.toBe('');
+    if (!bookedDay) {
+      await testInfo.attach('booking-confirmation-visible-text', {
+        body: normalizedConfirmationText,
+        contentType: 'text/plain',
+      });
+    }
     await captureStep(
       '20-booking-date-confirmed',
       page.locator('body'),
@@ -250,12 +273,17 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const confirmCancel = page.locator('button:visible').filter({ hasText: /yes,?\s*I.?m sure|confirm|cancel booking/i }).last();
     await expect(confirmCancel).toBeVisible({ timeout: 10_000 });
     await clickWithHighlight('26-confirm-cancellation', confirmCancel, 'STEP 26 - CONFIRM CANCELLATION');
-    await expect.poll(async () => {
-      const bodyText = await page.locator('body').innerText();
-      const cancellationOrEmptyState = /cancelled|canceled|no (?:upcoming )?bookings?|no reservations/i.test(bodyText);
-      const bookingCanStillBeCancelled = await cancelBooking.isVisible().catch(() => false);
-      return cancellationOrEmptyState && !bookingCanStillBeCancelled;
-    }, { timeout: 30_000 }).toBe(true);
+    await page.goto(new URL('/myaccount', testConfig.urls.home).toString(), { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/myaccount/);
+    const bookingsAfterCancellation = page.getByText(/^bookings$/i).first();
+    await expect(bookingsAfterCancellation).toBeVisible();
+    await bookingsAfterCancellation.click();
+    await expect(page.locator('body')).toContainText(/upcoming bookings|no bookings|no upcoming/i, { timeout: 15_000 });
+    if (confirmedBookingId) {
+      await expect(page.locator('body')).not.toContainText(confirmedBookingId);
+    } else {
+      await expect(page.locator('body')).not.toContainText(new RegExp(titlePattern, 'i'));
+    }
     await captureStep(
       '27-booking-cancelled',
       page.locator('body'),
