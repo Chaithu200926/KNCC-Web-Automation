@@ -28,7 +28,7 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     label: string,
   ) => {
     await captureStep(name, locator, label);
-    await locator.click({ force: true });
+    await locator.click();
   };
 
   const signInAfterShowtime = async () => {
