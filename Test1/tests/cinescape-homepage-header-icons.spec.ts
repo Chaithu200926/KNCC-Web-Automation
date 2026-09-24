@@ -1,6 +1,8 @@
 import { test, expect } from './fixtures';
 import { HomePage } from '../pages/HomePage';
 
+test.use({ video: 'off' });
+
 test('Homepage header icons', async ({ page, testConfig }, testInfo) => {
   const homePage = new HomePage(page);
 

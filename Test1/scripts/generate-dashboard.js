@@ -9,6 +9,14 @@ const assetDir = path.join(outputDir, 'assets');
 const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
 const tests = [];
 
+if (fs.existsSync(assetDir)) {
+  for (const fileName of fs.readdirSync(assetDir)) {
+    if (/^test-\d+-(?:video-\d+|transaction)\.[^.]+$/i.test(fileName)) {
+      fs.unlinkSync(path.join(assetDir, fileName));
+    }
+  }
+}
+
 function flattenSteps(steps, parentTitles = []) {
   return (steps || []).flatMap((step) => {
     const title = [...parentTitles, step.title].join(' › ');
@@ -34,21 +42,20 @@ function writeSnapshots(attachments, testIndex) {
 }
 
 function writeVideos(attachments, testIndex) {
-  return (attachments || [])
-    .filter((attachment) => attachment.contentType?.startsWith('video/') && attachment.path)
-    .map((attachment, videoIndex) => {
-      if (!fs.existsSync(attachment.path)) return null;
-      const extension = path.extname(attachment.path) || '.webm';
-      const fileName = `test-${testIndex + 1}-video-${videoIndex + 1}${extension}`;
-      fs.mkdirSync(assetDir, { recursive: true });
-      fs.copyFileSync(attachment.path, path.join(assetDir, fileName));
-      return {
-        name: attachment.name || 'Test video',
-        contentType: attachment.contentType,
-        path: `assets/${fileName}`,
-      };
-    })
-    .filter(Boolean);
+  const attachment = (attachments || []).find(
+    (item) => item.contentType?.startsWith('video/') && item.path && fs.existsSync(item.path),
+  );
+  if (!attachment) return [];
+
+  const extension = path.extname(attachment.path) || '.webm';
+  const fileName = `test-${testIndex + 1}-transaction${extension}`;
+  fs.mkdirSync(assetDir, { recursive: true });
+  fs.copyFileSync(attachment.path, path.join(assetDir, fileName));
+  return [{
+    name: attachment.name || 'Transaction video',
+    contentType: attachment.contentType,
+    path: `assets/${fileName}`,
+  }];
 }
 
 function collectSuite(suite, ancestors = []) {
@@ -57,7 +64,9 @@ function collectSuite(suite, ancestors = []) {
       const result = test.results?.[test.results.length - 1] || {};
       const status = result.status || test.status || 'unknown';
       const snapshots = writeSnapshots(result.attachments, tests.length);
-      const videos = writeVideos(result.attachments, tests.length);
+      const videos = /cinema booking/i.test(spec.title)
+        ? writeVideos(result.attachments, tests.length)
+        : [];
       const steps = flattenSteps(result.steps);
       const snapshotStepMap = {
         '01-movie-book-now': 'STEP 1 - CLICK BOOK NOW',

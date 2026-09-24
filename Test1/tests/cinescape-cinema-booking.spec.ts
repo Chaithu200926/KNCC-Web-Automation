@@ -2,6 +2,8 @@ import type { Locator } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { HomePage } from '../pages/HomePage';
 
+test.use({ launchOptions: { slowMo: 300 } });
+
 test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig }, testInfo) => {
   test.setTimeout(240_000);
 

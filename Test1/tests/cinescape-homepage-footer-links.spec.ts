@@ -1,6 +1,8 @@
 import { test, expect } from './fixtures';
 import { HomePage } from '../pages/HomePage';
 
+test.use({ video: 'off' });
+
 test('Homepage footer links navigation validation', async ({ page, testConfig }, testInfo) => {
   test.setTimeout(180_000);
   const homePage = new HomePage(page);
