@@ -208,9 +208,16 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     const confirmCancel = page.locator('button:visible').filter({ hasText: /yes,?\s*I.?m sure|confirm|cancel booking/i }).last();
     await expect(confirmCancel).toBeVisible({ timeout: 10_000 });
     await clickWithHighlight('26-confirm-cancellation', confirmCancel, 'STEP 26 - CONFIRM CANCELLATION');
-    await expect(page.locator('body')).toContainText(/cancelled|canceled|booking cancelled|no booking|upcoming bookings/i, {
-      timeout: 30_000,
-    });
-    await captureStep('27-booking-cancelled', page.locator('body'), 'STEP 27 - CANCELLATION VERIFIED');
+    await expect.poll(async () => {
+      const bodyText = await page.locator('body').innerText();
+      const cancellationOrEmptyState = /cancelled|canceled|no (?:upcoming )?bookings?|no reservations/i.test(bodyText);
+      const bookingCanStillBeCancelled = await cancelBooking.isVisible().catch(() => false);
+      return cancellationOrEmptyState && !bookingCanStillBeCancelled;
+    }, { timeout: 30_000 }).toBe(true);
+    await captureStep(
+      '27-booking-cancelled',
+      page.locator('body'),
+      'STEP 27 - CANCELLATION COMPLETE - NO ACTIVE BOOKING',
+    );
   });
 });

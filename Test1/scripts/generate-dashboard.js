@@ -64,7 +64,7 @@ function collectSuite(suite, ancestors = []) {
         '24-booking-found': 'STEP 24 - FIND NEW MOVIE BOOKING',
         '25-cancel-booking': 'STEP 25 - CANCEL BOOKING',
         '26-confirm-cancellation': 'STEP 26 - CONFIRM CANCELLATION',
-        '27-booking-cancelled': 'STEP 27 - CANCELLATION VERIFIED',
+        '27-booking-cancelled': 'STEP 27 - CANCELLATION COMPLETE - NO ACTIVE BOOKING',
         '01-home-page-loaded': 'Verify the home page is ready',
         '02-book-now-selected-before-click': 'Open the first movie session',
         '03-date-and-time-selection-loaded': 'Verify date and time selection is available',
