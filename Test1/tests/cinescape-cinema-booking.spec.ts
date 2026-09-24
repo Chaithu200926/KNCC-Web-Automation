@@ -153,9 +153,11 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
     await expect(selectedSeat).toHaveClass(/active/);
 
     const seatProceed = page.getByRole('button', { name: 'PROCEED', exact: true }).last();
+    await expect(seatProceed).toBeEnabled();
+    await seatProceed.scrollIntoViewIfNeeded();
     await captureStep('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP');
-    await seatProceed.click({ force: true });
-    await expect(page).toHaveURL(/\/food\//, { timeout: 15_000 });
+    await seatProceed.click();
+    await expect(page).toHaveURL(/\/food\//, { timeout: 30_000 });
   });
 
   await test.step('Skip food and continue to payment', async () => {
