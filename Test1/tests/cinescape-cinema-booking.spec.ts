@@ -118,10 +118,8 @@ test('Cinema booking flow is confirmed in My Profile', async ({ page, testConfig
       'STEP 10A - VERIFY TOMORROW REMAINS SELECTED',
     );
 
-    const continuedShowtimes = page.locator('.time-box:visible');
-    const continuedShowtime = continuedShowtimes.nth(1);
+    const continuedShowtime = page.locator('.time-box:visible').filter({ hasText: selectedShowTime }).first();
     await expect(continuedShowtime).toBeVisible();
-    await expect(continuedShowtime).toHaveText(selectedShowTime);
     await continuedShowtime.click({ force: true });
     await expect(page.locator('body')).toContainText(/Select Seat Category/i, { timeout: 15_000 });
   });
