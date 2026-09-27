@@ -1,4 +1,4 @@
-name: Demo Test cases
+name: Demo test
 
 on:
   push:
@@ -6,15 +6,6 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      suite:
-        description: Test suite to run
-        required: true
-        type: choice
-        options:
-          - all
-          - cinema-booking
-        default: all
 
 permissions:
   contents: read
@@ -47,18 +38,17 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
+      - name: Run the three Playwright tests
         env:
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           TEST_PIN: ${{ secrets.TEST_PIN }}
-          TEST_SUITE: ${{ inputs.suite || 'all' }}
-        run: |
-          if [ "$TEST_SUITE" = "cinema-booking" ]; then
-            npx playwright test tests/cinescape-cinema-booking.spec.ts --retries=0
-          else
-            npm test
-          fi
+        run: >
+          npx playwright test
+          tests/cinescape-homepage-header-icons.spec.ts
+          tests/cinescape-homepage-footer-links.spec.ts
+          tests/cinescape-cinema-booking.spec.ts
+          --retries=0
 
       - name: Generate visual dashboard
         if: always()
@@ -68,7 +58,7 @@ jobs:
         if: always()
         uses: dorny/test-reporter@v2
         with:
-          name: Playwright test results
+          name: Demo test results
           path: Test1/test-results/results.xml
           reporter: java-junit
 
@@ -76,8 +66,16 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: demo-test-playwright-report
           path: Test1/playwright-report/
+          retention-days: 14
+
+      - name: Upload dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-test-dashboard
+          path: Test1/dashboard/
           retention-days: 14
 
       - name: Configure GitHub Pages
