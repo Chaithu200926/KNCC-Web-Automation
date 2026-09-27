@@ -17,6 +17,8 @@ jobs:
   test:
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    outputs:
+      pages-enabled: ${{ steps.pages.outcome == 'success' }}
     defaults:
       run:
         working-directory: Test1
@@ -78,18 +80,22 @@ jobs:
           path: Test1/dashboard/
           retention-days: 14
 
+      # Pages must be enabled in the repo settings (Source: GitHub Actions).
+      # If it is not, skip publishing instead of failing the run.
       - name: Configure GitHub Pages
+        id: pages
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         uses: actions/configure-pages@v5
 
       - name: Upload dashboard for GitHub Pages
-        if: github.event_name != 'pull_request'
+        if: steps.pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: Test1/dashboard
 
   deploy-dashboard:
-    if: github.event_name != 'pull_request' && needs.test.result == 'success'
+    if: needs.test.result == 'success' && needs.test.outputs.pages-enabled == 'true'
     needs: test
     runs-on: ubuntu-latest
     concurrency:
