@@ -8,7 +8,8 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
-    "dashboard": "node scripts/generate-dashboard.js"
+    "dashboard": "node scripts/generate-dashboard.js",
+    "portal": "node team-portal/server.js"
   },
   "keywords": [],
   "author": "",

@@ -8,3 +8,4 @@ node_modules/
 /playwright/.cache/
 /playwright/.auth/
 /dashboard/
+/team-portal/data/
