@@ -22,6 +22,12 @@ permissions:
   pages: write
   id-token: write
 
+# Both test workflows book with the same account on the same UAT site, so run
+# them one after another instead of in parallel to avoid seat/booking clashes.
+concurrency:
+  group: cinescape-uat-tests
+  cancel-in-progress: false
+
 jobs:
   test:
     timeout-minutes: 15
@@ -94,18 +100,18 @@ jobs:
       # If it is not, skip publishing instead of failing the run.
       - name: Configure GitHub Pages
         id: pages
-        if: github.event_name != 'pull_request'
+        if: always() && github.event_name != 'pull_request'
         continue-on-error: true
         uses: actions/configure-pages@v5
 
       - name: Upload dashboard for GitHub Pages
-        if: steps.pages.outcome == 'success'
+        if: always() && steps.pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: Test1/dashboard
 
   deploy-dashboard:
-    if: needs.test.result == 'success' && needs.test.outputs.pages-enabled == 'true'
+    if: always() && needs.test.outputs.pages-enabled == 'true'
     needs: test
     runs-on: ubuntu-latest
     concurrency:
