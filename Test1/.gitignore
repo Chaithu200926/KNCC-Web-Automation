@@ -9,3 +9,5 @@ node_modules/
 /playwright/.auth/
 /dashboard/
 /team-portal/data/
+# Run history used by the dashboard trend chart (kept in the GitHub Actions cache).
+/.history/

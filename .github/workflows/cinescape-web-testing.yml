@@ -1,0 +1,150 @@
+# CINESCAPE WEB Testing: runs the three Playwright tests against the Cinescape UAT website
+# and publishes the results:
+#   * a results table on the run page (job summary),
+#   * a "Test results" check (JUnit),
+#   * the visual dashboard (trend, run info, steps, screenshots, videos) on GitHub Pages,
+#   * the dashboard, Playwright HTML report and raw results as downloadable artifacts.
+name: CINESCAPE WEB Testing
+
+on:
+  # Run on every push to main, except documentation-only changes.
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md']
+  # Allow starting it by hand from the Actions tab.
+  workflow_dispatch:
+
+# Read the code, publish the JUnit check, deploy to GitHub Pages.
+permissions:
+  contents: read
+  checks: write
+  pages: write
+  id-token: write
+
+# The booking test books with the same account on the same UAT site,
+# so runs wait for each other instead of running in parallel.
+concurrency:
+  group: cinescape-uat-tests
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Run the three web tests
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    # All commands run inside the Playwright project folder.
+    defaults:
+      run:
+        working-directory: Test1
+    steps:
+      # Get the code.
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # Install Node.js and reuse the npm download cache between runs.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Test1/package-lock.json
+
+      # Install the exact package versions from package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Download Chromium and the Linux libraries it needs.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Bring back the run history (for the trend chart) saved by the previous run.
+      - name: Restore run history
+        uses: actions/cache/restore@v4
+        with:
+          path: Test1/.history
+          key: cinescape-web-history-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: cinescape-web-history-
+
+      # Run the three tests one after another. A failure does not stop the job here,
+      # so the reports below are still built; the last step marks the run red instead.
+      - name: Run the three Playwright tests
+        id: tests
+        continue-on-error: true
+        env:
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          TEST_PIN: ${{ secrets.TEST_PIN }}
+        run: >
+          npx playwright test
+          tests/cinescape-homepage-header-icons.spec.ts
+          tests/cinescape-homepage-footer-links.spec.ts
+          tests/cinescape-cinema-booking.spec.ts
+          --retries=0
+
+      # Build the dashboard (with screenshots, videos and the Playwright report inside it)
+      # and put the results table on this run page.
+      - name: Build dashboard and run summary
+        if: always()
+        env:
+          HISTORY_FILE: .history/history.json
+        run: |
+          mkdir -p dashboard
+          if [ -d playwright-report ]; then rm -rf dashboard/playwright-report && cp -r playwright-report dashboard/playwright-report; fi
+          npm run dashboard
+
+      # Save the updated run history for the next run.
+      - name: Save run history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: Test1/.history
+          key: cinescape-web-history-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Show pass/fail per test as a "Test results" check on the commit.
+      - name: Publish test results check
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Test results
+          path: Test1/test-results/results.xml
+          reporter: java-junit
+
+      # Keep the dashboard, Playwright report and raw results downloadable for 14 days.
+      - name: Upload reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinescape-web-reports
+          path: |
+            Test1/dashboard/
+            Test1/test-results/
+          retention-days: 14
+
+      # Package the dashboard folder as the GitHub Pages website.
+      - name: Upload dashboard to Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: Test1/dashboard
+
+      # Mark the run red if any test failed (after all reports are saved).
+      - name: Fail the run if any test failed
+        if: always() && steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::One or more tests failed. See the summary above or the dashboard."
+          exit 1
+
+  deploy:
+    name: Publish dashboard to GitHub Pages
+    needs: test
+    # Publish even when tests failed, so the failure details are visible on the dashboard.
+    if: always() && needs.test.result != 'cancelled'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # Publish the website uploaded by the test job.
+      - name: Deploy dashboard to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
