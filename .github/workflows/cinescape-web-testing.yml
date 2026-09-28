@@ -3,7 +3,8 @@
 #   * a results table on the run page (job summary),
 #   * a "Test results" check (JUnit),
 #   * the visual dashboard (trend, run info, steps, screenshots, videos) on GitHub Pages,
-#   * the dashboard, Playwright HTML report and raw results as downloadable artifacts.
+#   * the dashboard, Playwright HTML report and raw results as a downloadable artifact
+#     (the Playwright report and traces are kept out of the public Pages site).
 name: CINESCAPE WEB Testing
 
 on:
@@ -81,15 +82,15 @@ jobs:
           tests/cinescape-cinema-booking.spec.ts
           --retries=0
 
-      # Build the dashboard (with screenshots, videos and the Playwright report inside it)
-      # and put the results table on this run page.
+      # Build the dashboard (with screenshots and videos) and put the results table on this run page.
+      # The Playwright HTML report is NOT copied into the public dashboard: its traces record
+      # typed values (password, OTP, card details). It stays in the artifact below only.
       - name: Build dashboard and run summary
         if: always()
         env:
           HISTORY_FILE: .history/history.json
         run: |
-          mkdir -p dashboard
-          if [ -d playwright-report ]; then rm -rf dashboard/playwright-report && cp -r playwright-report dashboard/playwright-report; fi
+          rm -rf dashboard/playwright-report
           npm run dashboard
 
       # Save the updated run history for the next run.
@@ -117,6 +118,7 @@ jobs:
           name: cinescape-web-reports
           path: |
             Test1/dashboard/
+            Test1/playwright-report/
             Test1/test-results/
           retention-days: 14
 

@@ -82,8 +82,8 @@ three tests on a GitHub-hosted Ubuntu machine with Chromium.
 |---|---|
 | **Run page summary** | Results table: each test's result, duration, number of steps, its last 10 results and the failure reason; plus a *Failed steps* table and the pass-rate trend. |
 | **"Test results" check** | Pass/fail per test on the commit (JUnit). |
-| **GitHub Pages dashboard** | Summary tiles, trend chart of recent runs, run & environment details, an overview table, and for every test its steps with screenshots, the failure details and the full test video. The Playwright HTML report is linked from the top of the page. |
-| **Artifact `cinescape-web-reports`** | The dashboard, Playwright HTML report and raw results (videos, traces, JUnit/JSON), kept for 14 days. |
+| **GitHub Pages dashboard** | Summary tiles, trend chart of recent runs, run & environment details, an overview table, and for every test its steps with screenshots, the failure details and the full test video. |
+| **Artifact `cinescape-web-reports`** | The dashboard, Playwright HTML report and raw results (videos, traces, JUnit/JSON), kept for 14 days. The Playwright report and traces are only here, never on the public Pages site, because traces record the values typed into fields. |
 
 A run is marked ❌ when any test fails. The dashboard is still published, so the failure can be
 inspected there.
