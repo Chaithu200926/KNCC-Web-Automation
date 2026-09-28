@@ -1,4 +1,5 @@
-# CINESCAPE WEB Testing: runs the three Playwright tests against the Cinescape UAT website
+# CINESCAPE WEB Testing: runs the four Playwright tests against the Cinescape UAT website
+# (header icons, footer links, booking paid with wallet, booking paid with KNET)
 # and publishes the results:
 #   * a results table on the run page (job summary),
 #   * a "Test results" check (JUnit),
@@ -22,7 +23,7 @@ permissions:
   pages: write
   id-token: write
 
-# The booking test books with the same account on the same UAT site,
+# The two booking tests book with the same account on the same UAT site,
 # so runs wait for each other instead of running in parallel.
 concurrency:
   group: cinescape-uat-tests
@@ -30,8 +31,8 @@ concurrency:
 
 jobs:
   test:
-    name: Run the three web tests
-    timeout-minutes: 25
+    name: Run the web tests
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     # All commands run inside the Playwright project folder.
     defaults:
@@ -66,20 +67,26 @@ jobs:
           key: cinescape-web-history-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: cinescape-web-history-
 
-      # Run the three tests one after another. A failure does not stop the job here,
+      # Run all four tests one after another. A failure does not stop the job here,
       # so the reports below are still built; the last step marks the run red instead.
-      - name: Run the three Playwright tests
+      - name: Run the Playwright tests
         id: tests
         continue-on-error: true
         env:
+          # Test account used by both booking tests.
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           TEST_PIN: ${{ secrets.TEST_PIN }}
+          # KNET test card used by the KNET booking test.
+          TEST_KNET_NUMBER: ${{ secrets.TEST_KNET_NUMBER }}
+          TEST_KNET_EXPIRY: ${{ secrets.TEST_KNET_EXPIRY }}
+          TEST_KNET_PIN: ${{ secrets.TEST_KNET_PIN }}
         run: >
           npx playwright test
           tests/cinescape-homepage-header-icons.spec.ts
           tests/cinescape-homepage-footer-links.spec.ts
           tests/cinescape-cinema-booking.spec.ts
+          tests/cinescape-cinema-booking-knet.spec.ts
           --retries=0
 
       # Build the dashboard (with screenshots and videos) and put the results table on this run page.

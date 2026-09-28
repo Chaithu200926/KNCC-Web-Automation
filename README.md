@@ -13,10 +13,13 @@ written with [Playwright](https://playwright.dev) and TypeScript.
 |---|---|---|
 | **Homepage header icons** | [`cinescape-homepage-header-icons.spec.ts`](Test1/tests/cinescape-homepage-header-icons.spec.ts) | Loads the homepage and checks the Cinescape header, Search, the Arabic/English language switch, My Profile (sign-in dialog) and the Menu. |
 | **Homepage footer links** | [`cinescape-homepage-footer-links.spec.ts`](Test1/tests/cinescape-homepage-footer-links.spec.ts) | Checks every footer heading, clicks each footer link and verifies where it lands, and checks the Sign in / Register buttons, app store and social media links. |
-| **Cinema booking flow** | [`cinescape-cinema-booking.spec.ts`](Test1/tests/cinescape-cinema-booking.spec.ts) | Books a real ticket end to end: picks a movie and tomorrow's showtime, signs in with email OTP, chooses seat category, ticket type and a seat, skips food, pays with the wallet, confirms the booking in **My Profile**, then **cancels it** so no booking is left behind. |
+| **Cinema booking flow (wallet)** | [`cinescape-cinema-booking.spec.ts`](Test1/tests/cinescape-cinema-booking.spec.ts) | Books a real ticket end to end: picks a movie and tomorrow's showtime, signs in with email OTP, chooses seat category, ticket type and a seat, skips food, pays with the wallet, confirms the booking in **My Profile**, then **cancels it** so no booking is left behind. |
+| **Cinema booking flow (KNET)** | [`cinescape-cinema-booking-knet.spec.ts`](Test1/tests/cinescape-cinema-booking-knet.spec.ts) | Same flow as the wallet booking, but pays with **KNET**: selects KNET, enters the test card on the KNET test gateway (`kpaytest.com.kw`), returns to the confirmation page, checks the booking in **My Profile** and cancels it. |
 
-The booking test uses a real test account on the UAT site. It is skipped automatically when
-`TEST_USERNAME`, `TEST_PASSWORD` or `TEST_PIN` is not set.
+The booking tests use a real test account on the UAT site. They are skipped automatically when
+`TEST_USERNAME`, `TEST_PASSWORD` or `TEST_PIN` is not set; the KNET test also needs the
+`TEST_KNET_*` settings. Card details are hidden in screenshots and videos, and the KNET test
+records no trace.
 
 ## Project layout
 
@@ -24,7 +27,7 @@ The booking test uses a real test account on the UAT site. It is skipped automat
 .github/workflows/
   cinescape-web-testing.yml   The CI workflow (see below)
 Test1/                        The Playwright project
-  tests/                      The three test files + shared fixtures
+  tests/                      The four test files + shared fixtures
   pages/HomePage.ts           Page object for the homepage (header, menu, sections)
   config/test-config.ts       Reads URLs and credentials from environment variables
   reporters/text-reporter.ts  Writes a plain-text execution log
@@ -43,7 +46,7 @@ npm ci                              # install packages
 npx playwright install chromium     # download the browser
 cp .env.example .env                # then fill in the values (see below)
 
-npm test                            # run all three tests
+npm test                            # run all four tests
 npm run test:headed                 # watch the browser while tests run
 npm run test:ui                     # Playwright's interactive UI mode
 npx playwright test tests/cinescape-homepage-header-icons.spec.ts   # run one test
@@ -58,23 +61,26 @@ npm run portal                      # start the local team portal (see team-port
 | Variable | Needed for | Meaning |
 |---|---|---|
 | `BASE_URL` | all tests | Site under test. Default: `https://uatweb.cinescape.com.kw` |
-| `TEST_USERNAME` | booking test | Test account email |
-| `TEST_PASSWORD` | booking test | Test account password |
-| `TEST_PIN` | booking test | Email OTP code for the test account |
+| `TEST_USERNAME` | booking tests | Test account email |
+| `TEST_PASSWORD` | booking tests | Test account password |
+| `TEST_PIN` | booking tests | Email OTP code for the test account |
+| `TEST_KNET_NUMBER` | KNET booking test | KNET test card number |
+| `TEST_KNET_EXPIRY` | KNET booking test | Card expiry as `MM/YY` |
+| `TEST_KNET_PIN` | KNET booking test | Card PIN, exactly 4 digits (the KNET test card accepts any 4 digits) |
 
 `.env` is git-ignored. Never commit real credentials.
 
 ## Continuous integration: **CINESCAPE WEB Testing**
 
-The workflow [`cinescape-web-testing.yml`](.github/workflows/cinescape-web-testing.yml) runs the
-three tests on a GitHub-hosted Ubuntu machine with Chromium.
+The workflow [`cinescape-web-testing.yml`](.github/workflows/cinescape-web-testing.yml) runs all
+four tests together on a GitHub-hosted Ubuntu machine with Chromium.
 
 - **When:** on every push to `main` (documentation-only changes are skipped) and on demand from
   **Actions → CINESCAPE WEB Testing → Run workflow**.
-- **One at a time:** runs queue instead of overlapping, because the booking test uses a single
+- **One at a time:** runs queue instead of overlapping, because both booking tests use a single
   test account on the shared UAT site.
 - **Secrets required** (Settings → Secrets and variables → Actions): `TEST_USERNAME`,
-  `TEST_PASSWORD`, `TEST_PIN`.
+  `TEST_PASSWORD`, `TEST_PIN`, `TEST_KNET_NUMBER`, `TEST_KNET_EXPIRY`, `TEST_KNET_PIN`.
 
 ### What each run produces
 

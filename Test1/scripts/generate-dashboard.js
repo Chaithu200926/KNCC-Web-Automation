@@ -92,6 +92,13 @@ const snapshotStepMap = {
   '18-open-wallet': 'STEP 18 - OPEN WALLET PAYMENT',
   '19-wallet-apply': 'STEP 19 - APPLY WALLET BALANCE',
   '20-confirm-booking': 'STEP 20 - CONFIRM BOOKING',
+  // KNET booking test (cinescape-cinema-booking-knet.spec.ts).
+  '18-select-knet': 'STEP 18 - SELECT KNET PAYMENT',
+  '19-knet-proceed': 'STEP 19 - PROCEED TO KNET',
+  '19a-knet-page': 'STEP 19A - KNET PAYMENT PAGE',
+  '19b-knet-details': 'STEP 19B - ENTER KNET CARD DETAILS',
+  '19c-knet-submit': 'STEP 19C - SUBMIT KNET PAYMENT',
+  '19d-knet-confirm': 'STEP 19D - CONFIRM KNET PAYMENT',
   '20-booking-date-confirmed': 'STEP 20A - VERIFY BOOKING DATE',
   '21-my-profile': 'STEP 21 - OPEN MY PROFILE',
   '22-my-profile': 'STEP 22 - MY PROFILE OPENED',
