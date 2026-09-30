@@ -21,6 +21,17 @@ The booking tests use a real test account on the UAT site. They are skipped auto
 `TEST_KNET_*` settings. Card details are hidden in screenshots and videos, and the KNET test
 records no trace.
 
+## Related test projects
+
+The other Cinescape test projects are separate repositories (they sit next to `Test1/` on the QA PC and are
+ignored by this repo):
+
+| Project | Repository | Dashboard |
+|---|---|---|
+| Kiosk backend API | [CinescapeKiosk-API-Automation](https://github.com/Chaithu200926/CinescapeKiosk-API-Automation) | <https://chaithu200926.github.io/CinescapeKiosk-API-Automation/> |
+| Kiosk Windows app (UI, build 13) | [Kiosk-UI-13-Test-Automation](https://github.com/Chaithu200926/Kiosk-UI-13-Test-Automation) | <https://chaithu200926.github.io/Kiosk-UI-13-Test-Automation/> |
+| Android app | [Cinescape-Android-Test-Automation](https://github.com/Chaithu200926/Cinescape-Android-Test-Automation) (private) | local HTML report |
+
 ## Project layout
 
 ```
