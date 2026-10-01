@@ -12,10 +12,9 @@ import { appears, openHome } from '../pages/WebSite'; // Opens the homepage; wai
 test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (registration and several sign-ins on the slow UAT site).
 
 test('WEB-13 Change password', async ({ page, step, testConfig }, testInfo) => {
-  const user = newTestUser(); // A new user for this run.
+  let user = newTestUser(); // The new user for this run (set in the set-up step).
   const otp = testConfig.newUserOtp; // Email / mobile OTP (111111 on UAT).
   const newPassword = 'Auto@Kncc2028'; // The changed password.
-  testInfo.annotations.push({ type: 'new user', description: user.email });
   // Opens My Account > PROFILE and the "Change Password" dialog.
   const openDialog = async () => {
     await page.goto(new URL('/myaccount', testConfig.urls.home).toString(), { waitUntil: 'commit' }); // My Account > PROFILE.
@@ -23,7 +22,10 @@ test('WEB-13 Change password', async ({ page, step, testConfig }, testInfo) => {
   };
 
   await step('Set-up: register a new user for this test, sign out and sign in again', async () => {
-    await registerNewUser(page, testConfig.urls.home, user, otp); // SIGN UP, Save, OTPs.
+    const registered = await registerNewUser(page, testConfig.urls.home, otp); // SIGN UP, Save, OTPs; signed in.
+    user = registered.user;
+    testInfo.annotations.push({ type: 'new user', description: user.email });
+    if (registered.refused.length) testInfo.annotations.push({ type: 'sign-up refused first', description: registered.refused.join('; ') });
     // Right after signing up My Account does not open on UAT (WEB-05), so the new user signs in again first.
     await signOut(page); // MENU > LOGOUT.
     await signIn(page, { username: user.email, password: user.password, pin: otp }); // Email, password, OTP.

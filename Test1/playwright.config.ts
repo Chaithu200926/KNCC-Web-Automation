@@ -40,8 +40,10 @@ export default defineConfig({
     /* Base URL used by the Cinescape smoke test. */
     baseURL: testConfig.urls.home,
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on',
+    /* Trace of each failed test (step-by-step replay). See https://playwright.dev/docs/trace-viewer */
+    trace: 'retain-on-failure', // Traces only for failed tests (a trace of every test made the CI report bundle about 4 GB).
+    /* No click or fill waits longer than 60 s (otherwise a stuck click only stops at the test timeout). */
+    actionTimeout: 60_000,
     screenshot: 'on',
     video: 'on',
 

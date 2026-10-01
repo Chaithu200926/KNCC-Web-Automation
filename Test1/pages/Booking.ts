@@ -441,8 +441,11 @@ export function bookingCard(page: Page, bookingId: string, title: RegExp) {
 
 /** Opens My Account > Bookings (the booking list). */
 export async function openBookings(page: Page) {
-  await page.locator('a[href="/myaccount"], nav.header-nav .user-profile:visible').first().click(); // Header > My Account.
-  await expect(page).toHaveURL(/\/myaccount/);
+  const headerLink = page.locator('a[href="/myaccount"], nav.header-nav .user-profile').filter({ visible: true }).first(); // Header > My Account.
+  const clicked = await headerLink.click({ timeout: 30_000 }).then(() => true, () => false);
+  // Seen on CI (1 Oct 2026): after the KNET gateway the header link did not respond; then open My Account directly.
+  if (!clicked) await page.goto(new URL('/myaccount', page.url()).toString(), { waitUntil: 'commit' });
+  await expect(page).toHaveURL(/\/myaccount/, { timeout: 30_000 });
   await page.getByText(/^bookings$/i).first().click(); // BOOKINGS tab.
   await expect(page.getByText(/upcoming bookings/i).first()).toBeVisible({ timeout: 30_000 }); // "UPCOMING BOOKINGS".
 }

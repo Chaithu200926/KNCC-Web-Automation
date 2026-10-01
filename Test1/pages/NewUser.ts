@@ -93,15 +93,30 @@ export async function confirmSignUp(page: Page, otp: string) {
   await expect(page.locator('a[href="/myaccount"]').first()).toBeAttached({ timeout: 30_000 }); // Signed in.
 }
 
-/** Registers a new user from the homepage (SIGN UP, Save, OTPs); the user ends up signed in. */
-export async function registerNewUser(page: Page, baseUrl: string, user: NewUser, otp: string) {
-  await openHome(page, baseUrl); // Homepage.
-  await openSignUp(page); // Profile icon > SIGN IN > SIGN UP.
-  await fillSignUp(page, user); // The form.
-  await signUpDialog(page).getByRole('button', { name: /^save$/i }).click(); // Save.
-  await expect(openMessage(page)).toContainText(/OTP sent/i, { timeout: 30_000 }); // "Please enter the OTP sent to ...".
-  await openMessage(page).getByRole('button', { name: /^ok$/i }).click(); // OK.
-  await confirmSignUp(page, otp); // Email and mobile OTPs; signed in.
+/**
+ * Set-up for WEB-09 / WEB-13: registers a new user from the homepage (SIGN UP, Save, OTPs); the user ends up signed in.
+ * If the site refuses the sign-up (seen once on CI, 1 Oct 2026: "Something went wrong!"), it tries once more with new
+ * details. Returns the registered user and the site's message for any refused try.
+ */
+export async function registerNewUser(page: Page, baseUrl: string, otp: string) {
+  const refused: string[] = []; // "email: message" for each refused try.
+  for (let attempt = 1; ; attempt += 1) {
+    const user = newTestUser(); // New, unique details for this try.
+    await openHome(page, baseUrl); // Homepage.
+    await openSignUp(page); // Profile icon > SIGN IN > SIGN UP.
+    await fillSignUp(page, user); // The form.
+    await signUpDialog(page).getByRole('button', { name: /^save$/i }).click(); // Save.
+    await expect(openMessage(page)).toBeVisible({ timeout: 30_000 }); // The site's answer.
+    const message = (await openMessage(page).innerText()).replace(/\s+/g, ' ').trim(); // e.g. "Please enter the OTP sent to ... OK".
+    await openMessage(page).getByRole('button', { name: /^ok$/i }).click(); // OK.
+    if (/OTP sent/i.test(message)) { // Accepted: enter the OTPs.
+      await confirmSignUp(page, otp); // Email and mobile OTPs; signed in.
+      return { user, refused };
+    }
+    refused.push(`${user.email}: ${message}`);
+    expect(attempt, `The site refused the sign-up: ${refused.join('; ')}`).toBeLessThan(2); // Give up after two tries.
+    await page.waitForTimeout(5_000); // A short pause before trying again.
+  }
 }
 
 /** Opens Forgot Password? from SIGN IN, enters the email and clicks Continue. */

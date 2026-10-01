@@ -12,13 +12,15 @@ import { openHome } from '../pages/WebSite'; // Opens the homepage.
 test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (registration and several sign-ins on the slow UAT site).
 
 test('WEB-09 Forgot password', async ({ page, step, testConfig }, testInfo) => {
-  const user = newTestUser(); // A new user for this run.
+  let user = newTestUser(); // The new user for this run (set in the set-up step).
   const otp = testConfig.newUserOtp; // Email / mobile OTP (111111 on UAT).
   const newPassword = 'Auto@Kncc2027'; // The password set with Forgot Password.
-  testInfo.annotations.push({ type: 'new user', description: user.email });
 
   await step('Set-up: register a new user for this test and sign out', async () => {
-    await registerNewUser(page, testConfig.urls.home, user, otp); // SIGN UP, Save, OTPs; signed in.
+    const registered = await registerNewUser(page, testConfig.urls.home, otp); // SIGN UP, Save, OTPs; signed in.
+    user = registered.user;
+    testInfo.annotations.push({ type: 'new user', description: user.email });
+    if (registered.refused.length) testInfo.annotations.push({ type: 'sign-up refused first', description: registered.refused.join('; ') });
     await signOut(page); // MENU > LOGOUT.
   });
 
