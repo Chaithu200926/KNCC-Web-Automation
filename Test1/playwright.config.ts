@@ -23,6 +23,8 @@ export default defineConfig({
   /* Keep one recorded attempt per test in CI. */
   retries: 0,
   timeout: 60_000,
+  /* Checks wait up to 10 s by default (Playwright's own default is 5 s): the UAT site is often slow to redraw. */
+  expect: { timeout: 10_000 },
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Keep terminal output local and publish machine-readable results in CI. */
@@ -42,6 +44,12 @@ export default defineConfig({
     trace: 'on',
     screenshot: 'on',
     video: 'on',
+
+    /* Incognito: every test gets a brand-new private browser context (no cookies, cache, local storage or sign-in
+       from earlier tests are kept, and nothing is written to a browser profile), so no cache clearing is needed.
+       Chromium also starts in incognito mode, and service workers (which can serve cached pages) are blocked. */
+    launchOptions: { args: ['--incognito'] },
+    serviceWorkers: 'block',
   },
 
   /* Configure projects for major browsers */

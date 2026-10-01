@@ -206,7 +206,7 @@ async function handleApi(req, res, url) {
     const startedAt = new Date().toISOString();
     const cli = path.join(projectRoot, 'node_modules', '@playwright', 'test', 'cli.js');
     const args = [cli, 'test', '--retries=0'];
-    if (suite === 'cinema-booking') args.push('tests/cinescape-cinema-booking.spec.ts');
+    if (suite === 'cinema-booking') args.push('tests/web-03-cinema-booking-with-wallet.spec.ts');
     const child = spawn(process.execPath, args, { cwd: projectRoot, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
     activeRun = { runId, startedAt, child };
     const logFile = path.join(runsRoot, `${runId}.log`);

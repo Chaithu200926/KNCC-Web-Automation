@@ -1,4 +1,5 @@
-// Cinema booking paid with KNET: same user flow as cinescape-cinema-booking.spec.ts, but the payment
+// WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// Cinema booking paid with KNET: same user flow as web-03-cinema-booking-with-wallet.spec.ts, but the payment
 // step uses the KNET test gateway (kpaytest.com.kw) instead of the wallet. The booking is cancelled
 // at the end so no booking is left on the test account.
 import type { Locator } from '@playwright/test'; // Type for element locators (used in helper signatures).
@@ -10,7 +11,7 @@ import { HomePage } from '../pages/HomePage'; // Page object for the homepage (B
 // which here would include the KNET card number and PIN. Screenshots and the video still run.
 test.use({ launchOptions: { slowMo: 300 }, trace: 'off' });
 
-test('Cinema booking with KNET payment is confirmed in My Profile', async ({ page, testConfig }, testInfo) => {
+test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', async ({ page, testConfig }, testInfo) => {
   // The whole flow (sign-in, seat, KNET gateway, cancellation) needs more than the default 60 s.
   test.setTimeout(300_000);
 
@@ -141,7 +142,7 @@ test('Cinema booking with KNET payment is confirmed in My Profile', async ({ pag
     await clickWithHighlight('02-experience', experience, 'STEP 2 - CHOOSE CINESCAPE 360 EXPERIENCE'); // Select it.
 
     const date = page.getByRole('tab').nth(1); // Second date tab = tomorrow.
-    await expect(date).toBeVisible(); // Wait for the date tabs.
+    await expect(date).toBeVisible({ timeout: 30_000 }); // Wait for the date tabs (UAT can take a while to load them).
     await clickWithHighlight('03-date', date, 'STEP 3 - CHOOSE TOMORROW', true); // Select tomorrow (real click).
     await expect(date).toHaveAttribute('aria-selected', 'true'); // Confirm tomorrow is selected.
     selectedShowDate = (await date.innerText()).replace(/\s+/g, ' ').trim(); // Remember the date text.

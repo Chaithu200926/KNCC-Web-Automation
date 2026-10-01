@@ -1,6 +1,6 @@
-# CINESCAPE WEB Testing: runs the four Playwright tests against the Cinescape UAT website
-# (header icons, footer links, booking paid with wallet, booking paid with KNET)
-# and publishes the results:
+# CINESCAPE WEB Testing: runs every automated website test case (WEB-01..WEB-49, one spec file per case in
+# Test1/tests/web-NN-*.spec.ts) against the Cinescape UAT website, one test at a time, each in a new incognito
+# browser context, and publishes the results:
 #   * a results table on the run page (job summary),
 #   * a "Test results" check (JUnit),
 #   * the visual dashboard (trend, run info, steps, screenshots, videos) on GitHub Pages,
@@ -23,7 +23,7 @@ permissions:
   pages: write
   id-token: write
 
-# The two booking tests book with the same account on the same UAT site,
+# The tests book with the same accounts on the same UAT site,
 # so runs wait for each other instead of running in parallel.
 concurrency:
   group: cinescape-uat-tests
@@ -32,7 +32,8 @@ concurrency:
 jobs:
   test:
     name: Run the web tests
-    timeout-minutes: 30
+    # A full run takes about 40 minutes (WEB-29 alone waits about 9 minutes for a seat hold).
+    timeout-minutes: 100
     runs-on: ubuntu-latest
     # All commands run inside the Playwright project folder.
     defaults:
@@ -67,27 +68,27 @@ jobs:
           key: cinescape-web-history-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: cinescape-web-history-
 
-      # Run all four tests one after another. A failure does not stop the job here,
+      # Run all test cases one after another (workers = 1 on CI). A failure does not stop the job here,
       # so the reports below are still built; the last step marks the run red instead.
       - name: Run the Playwright tests
         id: tests
         continue-on-error: true
         env:
-          # Test account used by both booking tests.
+          # Main test account (sign-in and booking tests).
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           TEST_PIN: ${{ secrets.TEST_PIN }}
-          # KNET test card used by the KNET booking test.
+          # Second test account (no wallet balance): the second user in WEB-29 / 34 / 43, the empty wallet in WEB-49.
+          TEST2_USERNAME: ${{ secrets.TEST2_USERNAME }}
+          TEST2_PASSWORD: ${{ secrets.TEST2_PASSWORD }}
+          TEST2_PIN: ${{ secrets.TEST2_PIN }}
+          # WEB-05 / 09 / 13 register a new UAT user each run; the email and mobile OTP for new users is 111111 on UAT.
+          TEST_NEW_USER_OTP: '111111'
+          # KNET test card used by the KNET tests (WEB-04, WEB-34, WEB-48).
           TEST_KNET_NUMBER: ${{ secrets.TEST_KNET_NUMBER }}
           TEST_KNET_EXPIRY: ${{ secrets.TEST_KNET_EXPIRY }}
           TEST_KNET_PIN: ${{ secrets.TEST_KNET_PIN }}
-        run: >
-          npx playwright test
-          tests/cinescape-homepage-header-icons.spec.ts
-          tests/cinescape-homepage-footer-links.spec.ts
-          tests/cinescape-cinema-booking.spec.ts
-          tests/cinescape-cinema-booking-knet.spec.ts
-          --retries=0
+        run: npx playwright test --retries=0
 
       # Build the dashboard (with screenshots and videos) and put the results table on this run page.
       # The Playwright HTML report is NOT copied into the public dashboard: its traces record

@@ -28,7 +28,7 @@ const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
 // Remove screenshots/videos from the previous build so old files are not published.
 if (fs.existsSync(assetDir)) {
   for (const fileName of fs.readdirSync(assetDir)) {
-    if (/^test-\d+-(?:snapshot-\d+\.png|video\.[^.]+)$/i.test(fileName)) fs.unlinkSync(path.join(assetDir, fileName));
+    if (/^test-\d+-(?:snapshot-\d+\.png|video(?:-\d+)?\.[^.]+)$/i.test(fileName)) fs.unlinkSync(path.join(assetDir, fileName));
   }
 }
 
@@ -48,26 +48,29 @@ function flattenSteps(steps, parentTitles = []) {
   });
 }
 
-// Save each screenshot a test attached as a PNG file in dashboard/assets.
+// Save each screenshot a test attached (inline or as a file) as a PNG file in dashboard/assets.
 function writeSnapshots(attachments, testIndex) {
   return (attachments || [])
-    .filter((a) => a.contentType === 'image/png' && a.body)
+    .filter((a) => a.contentType === 'image/png' && (a.body || (a.path && fs.existsSync(a.path))))
     .map((a, i) => {
       const fileName = `test-${testIndex + 1}-snapshot-${i + 1}.png`;
       fs.mkdirSync(assetDir, { recursive: true });
-      fs.writeFileSync(path.join(assetDir, fileName), Buffer.from(a.body, 'base64'));
+      if (a.body) fs.writeFileSync(path.join(assetDir, fileName), Buffer.from(a.body, 'base64'));
+      else fs.copyFileSync(a.path, path.join(assetDir, fileName));
       return { name: a.name, path: `assets/${fileName}` };
     });
 }
 
-// Copy the test's video (if recorded) into dashboard/assets.
-function writeVideo(attachments, testIndex) {
-  const a = (attachments || []).find((x) => x.contentType?.startsWith('video/') && x.path && fs.existsSync(x.path));
-  if (!a) return null;
-  const fileName = `test-${testIndex + 1}-video${path.extname(a.path) || '.webm'}`;
-  fs.mkdirSync(assetDir, { recursive: true });
-  fs.copyFileSync(a.path, path.join(assetDir, fileName));
-  return { contentType: a.contentType, path: `assets/${fileName}` };
+// Copy the test's videos (the test page, and a second user's browser if any) into dashboard/assets.
+function writeVideos(attachments, testIndex) {
+  return (attachments || [])
+    .filter((x) => x.contentType?.startsWith('video/') && x.path && fs.existsSync(x.path))
+    .map((a, i) => {
+      const fileName = `test-${testIndex + 1}-video${i ? `-${i + 1}` : ''}${path.extname(a.path) || '.webm'}`;
+      fs.mkdirSync(assetDir, { recursive: true });
+      fs.copyFileSync(a.path, path.join(assetDir, fileName));
+      return { name: a.name === 'video' ? 'Test video' : a.name, contentType: a.contentType, path: `assets/${fileName}` };
+    });
 }
 
 // Which step each named screenshot belongs to (screenshot name → end of the step title).
@@ -92,7 +95,7 @@ const snapshotStepMap = {
   '18-open-wallet': 'STEP 18 - OPEN WALLET PAYMENT',
   '19-wallet-apply': 'STEP 19 - APPLY WALLET BALANCE',
   '20-confirm-booking': 'STEP 20 - CONFIRM BOOKING',
-  // KNET booking test (cinescape-cinema-booking-knet.spec.ts).
+  // KNET booking test (web-04-cinema-booking-with-knet.spec.ts).
   '18-select-knet': 'STEP 18 - SELECT KNET PAYMENT',
   '19-knet-proceed': 'STEP 19 - PROCEED TO KNET',
   '19a-knet-page': 'STEP 19A - KNET PAYMENT PAGE',
@@ -146,12 +149,19 @@ function collect(suite, ancestors = []) {
       const steps = flattenSteps(r.steps).filter(
         (s) => !s.title.split(' › ').some((part) => /^(Before Hooks|After Hooks|Worker Cleanup|Fixture |Attach ")/i.test(part)),
       );
-      // Put each screenshot under the step it belongs to.
+      // Put each screenshot under the step it belongs to; the others (e.g. a second user's screen, the last screen)
+      // are listed separately.
+      const otherSnapshots = [];
       for (const snap of snapshots) {
-        const target = snapshotStepMap[snap.name] || footerStepTitle(snap.name);
+        // Mapped names first; otherwise a screenshot named after its step title goes under that step (the WEB-xx tests).
+        const target = snapshotStepMap[snap.name] || footerStepTitle(snap.name) || snap.name;
         const step = target && steps.find((s) => s.title.endsWith(target));
         if (step) (step.snapshots ||= []).push(snap);
+        else otherSnapshots.push(snap);
       }
+      // Notes the test recorded (booking IDs, amounts, what the site showed), without repeats.
+      const notes = [...(t.annotations || []), ...(r.annotations || [])]
+        .filter((n, j, all) => all.findIndex((m) => m.type === n.type && m.description === n.description) === j);
       tests.push({
         id: spec.title,
         title: [...ancestors, spec.title].filter(Boolean).join(' › '),
@@ -161,7 +171,9 @@ function collect(suite, ancestors = []) {
         duration: r.duration || 0,
         error: stripAnsi(r.error?.message),
         steps,
-        video: writeVideo(r.attachments, index),
+        otherSnapshots,
+        notes,
+        videos: writeVideos(r.attachments, index),
       });
     }
   }
@@ -329,8 +341,10 @@ const testCards = tests
   </header>
   <p class="file">${esc(t.file)} · ${esc(t.browser)} · ${t.steps.length} steps${failedSteps ? ` · ${failedSteps} failed` : ''}</p>
   ${t.error ? `<details class="err" open><summary>Failure details</summary><pre class="error">${esc(t.error)}</pre></details>` : ''}
-  ${t.video ? `<details><summary>Watch test video</summary><video class="video" controls preload="metadata"><source src="${esc(t.video.path)}" type="${esc(t.video.contentType)}">Your browser cannot play WebM video.</video></details>` : ''}
+  ${t.notes.length ? `<details open><summary>Notes from the test (${t.notes.length})</summary><ul class="notes">${t.notes.map((n) => `<li><b>${esc(n.type)}:</b> ${esc(n.description)}</li>`).join('')}</ul></details>` : ''}
+  ${t.videos.map((v) => `<details><summary>Watch ${esc(v.name.toLowerCase().startsWith('user 2') ? v.name : 'test video')}</summary><video class="video" controls preload="metadata"><source src="${esc(v.path)}" type="${esc(v.contentType)}">Your browser cannot play WebM video.</video></details>`).join('')}
   <details ${t.error ? 'open' : ''}><summary>${t.steps.length} execution steps with screenshots</summary>${stepsHtml(t.steps)}</details>
+  ${t.otherSnapshots.length ? `<details><summary>Other screenshots (${t.otherSnapshots.length})</summary><div class="others">${t.otherSnapshots.map((p) => `<figure><a href="${esc(p.path)}" target="_blank"><img class="snapshot" loading="lazy" src="${esc(p.path)}" alt="Screenshot: ${esc(p.name)}"></a><figcaption>${esc(p.name)}</figcaption></figure>`).join('')}</div></details>` : ''}
 </article>`;
   })
   .join('\n');
@@ -416,6 +430,8 @@ details { margin-top:8px; } summary { cursor:pointer; color:var(--accent); font-
 pre { background:var(--code); border:1px solid var(--line); border-radius:6px; padding:10px; overflow:auto; max-height:360px; font:12px/1.45 Consolas, monospace; white-space:pre-wrap; word-break:break-word; }
 pre.error { color:var(--critical-ink); }
 .video { display:block; width:min(100%,720px); margin-top:8px; border:1px solid var(--line); border-radius:8px; background:#000; }
+.notes { margin:6px 0 0; padding-left:18px; } .notes li { margin:3px 0; overflow-wrap:anywhere; }
+.others { display:flex; flex-wrap:wrap; gap:10px; } .others figure { margin:0; } .others figcaption { font-size:12px; color:var(--muted); max-width:320px; }
 .steps { margin:8px 0 0; padding-left:22px; font-size:13px; display:grid; gap:8px; }
 .step-row { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; } .step-title { flex:1; min-width:200px; }
 .steps li.bad .step-title { color:var(--critical-ink); }
