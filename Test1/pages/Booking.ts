@@ -417,7 +417,7 @@ export async function payWithKnet(page: Page, card: KnetCard) {
   const number = page.locator('#debitNumber'); // Card number box.
   const expiry = page.getByPlaceholder('MM/YY').filter({ visible: true }).first(); // Expiry box.
   const pin = page.locator('input[title*="PIN" i]').filter({ visible: true }).first(); // PIN box.
-  await expect(number).toBeVisible({ timeout: 30_000 });
+  await expect(number).toBeVisible({ timeout: 60_000 }); // The KNET test gateway can be slow (seen on CI, 1 Oct 2026).
   for (const input of [number, expiry, pin]) await hide(input);
   await number.fill(card.knetNumber); // Card number.
   await expiry.fill(card.knetExpiry); // Expiry MM/YY.

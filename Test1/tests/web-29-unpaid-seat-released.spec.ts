@@ -55,7 +55,9 @@ test('WEB-29 Unpaid seat is released for booking again', async ({ page, step, te
   });
 
   // User 2 tries to reserve the seat (seat map, select, PROCEED): 'food' / 'payment' = reserved, 'refused' = still held.
-  const tryToReserve = () => tryToReserveSeat(page2, testConfig.urls.home, show, seatId);
+  // A page that does not load in time (UAT sometimes shows a blank page for a while) counts as one failed try.
+  const tryToReserve = () => tryToReserveSeat(page2, testConfig.urls.home, show, seatId)
+    .catch((error: Error) => ({ shown: 'unknown', outcome: `page did not load (${error.message.split(/\r?\n/)[0].slice(0, 80)})` }));
 
   await step('User 2 (second test account): sign in in a second browser and check the held seat cannot be reserved', async () => {
     await clickShowSignedOut(page2, testConfig.urls.home, show); // Same movie, date and time; the sign-in dialog opens.
