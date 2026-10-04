@@ -32,7 +32,7 @@ concurrency:
 jobs:
   test:
     name: Run the web tests
-    # A full run takes about 40 minutes (WEB-29 alone waits about 9 minutes for a seat hold).
+    # A full run takes about 30 minutes.
     timeout-minutes: 100
     runs-on: ubuntu-latest
     # All commands run inside the Playwright project folder.
@@ -78,7 +78,7 @@ jobs:
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           TEST_PIN: ${{ secrets.TEST_PIN }}
-          # Second test account (no wallet balance): the second user in WEB-29 / 31 / 38, the empty wallet in WEB-43.
+          # Second test account (no wallet balance): the second user in WEB-31 / 38, the empty wallet in WEB-43.
           TEST2_USERNAME: ${{ secrets.TEST2_USERNAME }}
           TEST2_PASSWORD: ${{ secrets.TEST2_PASSWORD }}
           TEST2_PIN: ${{ secrets.TEST2_PIN }}
