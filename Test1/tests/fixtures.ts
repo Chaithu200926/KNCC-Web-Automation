@@ -6,7 +6,7 @@ import { cancelBookingInMyProfile, paidNotCancelled } from '../pages/Booking'; /
 /** Runs a named test step, then attaches a screenshot with the same name (the dashboard shows it under that step). */
 export type StepWithShot = (title: string, body: () => Promise<void>) => Promise<void>;
 
-/** A second user in a separate browser (own cookies and sign-in), e.g. the second test account in WEB-31 and WEB-38. */
+/** A second user in a separate browser (own cookies and sign-in), e.g. the second test account in WEB-31, WEB-38 and WEB-44. */
 export interface SecondUser {
   page: Page; // The second user's page.
   shot: (title: string) => Promise<void>; // Attaches a screenshot of the second user's page, named "User 2: <title>".
