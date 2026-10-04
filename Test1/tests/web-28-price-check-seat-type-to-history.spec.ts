@@ -7,8 +7,9 @@ import { test, expect } from './fixtures'; // Shared setup: testConfig (site, te
 import { openAccountTab, openMyAccount } from '../pages/Account'; // My Account and its tabs.
 import { fils, flatText, hoursUntilShow, readKwd, readKwdAfter, readWalletBalance } from '../pages/BookingChecks'; // Amount helpers.
 import { // Booking steps (see pages/Booking.ts):
-  cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, openMessage, payWithWallet, proceedFromSeatMap,
-  proceedToSeatMap, quantity, readPaymentSummary, selectAvailableSeats, setTicketCount, signInAndReopenShow, type Show,
+  cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, openMessage, payWithWallet,
+  proceedToSeatMap, proceedWithFreeSeats, quantity, readPaymentSummary, selectAvailableSeats, setTicketCount,
+  signInAndReopenShow, type Show,
 } from '../pages/Booking';
 import { addFood, foodItems, foodPageTotal, foodPrice, openedFoodPage, proceedFromFood } from '../pages/Food'; // Food page steps.
 import { appears } from '../pages/WebSite'; // Waits for a pop-up.
@@ -43,7 +44,8 @@ test('WEB-28 Price check from seat type to history', async ({ page, step, testCo
   await step(`Choose ${TICKETS} seats and add one food item; check the food page TOTAL = tickets + food`, async () => {
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, TICKETS); // Two free seats.
-    expect(await proceedFromSeatMap(page), "Today's show should offer food").toBe('food'); // Food page.
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show!, TICKETS); // PROCEED (other seats if one is held).
+    expect(next, "Today's show should offer food").toBe('food'); // Food page.
     expect.soft(fils(await openedFoodPage(page)), 'Food page TOTAL before food = the tickets').toBe(fils(price) * TICKETS);
     const item = foodItems(page).first(); // First item of the first category, e.g. "Combo 2".
     itemName = (await item.locator('h4').innerText()).trim();
@@ -85,7 +87,7 @@ test('WEB-28 Price check from seat type to history', async ({ page, step, testCo
     await card.getByText(/^view details$/i).click(); // View Details.
     await expect(page.getByText(/^close details$/i).filter({ visible: true }).first()).toBeVisible(); // Expanded (Close Details).
     const expanded = page.locator('div').filter({ visible: true }).filter({ has: page.getByText(/^close details$/i) })
-      .filter({ hasText: /grand total/i }).filter({ hasText: booking.bookingId }).last(); // The expanded block (as in WEB-38).
+      .filter({ hasText: /grand total/i }).filter({ hasText: booking.bookingId }).last(); // The expanded block (as in WEB-35).
     const details = flatText(await expanded.innerText()); // Ticket details and transaction details.
     testInfo.annotations.push({ type: 'history details', description: details });
     const ticketPrice = readKwdAfter(details, 'Ticket Price'); // The ticket line.

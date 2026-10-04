@@ -1,4 +1,4 @@
-// WEB-43 Same seat chosen by two users - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-38 Same seat chosen by two users - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Two test accounts in two separate browsers choose the same free seat of tomorrow's show. User 1 (main test account)
 // clicks PROCEED first and holds the seat; then user 2 (second test account) clicks PROCEED and must be refused.
 // After user 1 cancels, the seat must be free for user 2. Nothing is paid, and user 2 never holds a seat.
@@ -13,7 +13,7 @@ import { // Booking steps (see pages/Booking.ts):
 
 test.describe.configure({ timeout: 420_000 }); // Up to 7 minutes (two sign-ins and several seat maps on the slow UAT site).
 
-test('WEB-43 Same seat chosen by two users', async ({ page, step, testConfig, secondUser }, testInfo) => {
+test('WEB-38 Same seat chosen by two users', async ({ page, step, testConfig, secondUser }, testInfo) => {
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
   const second = testConfig.secondAccount; // The second test account (user 2).
@@ -24,6 +24,9 @@ test('WEB-43 Same seat chosen by two users', async ({ page, step, testConfig, se
   let show: Show; // The show both users open.
   let seatId = ''; // The seat both users choose.
   let seatName = ''; // Its row and number, e.g. "K18".
+  // User 2 opens the show's seat map again and reads the seat. A page that does not load in time (UAT sometimes shows a
+  // blank page for a while; on CI, 1 Oct 2026, one slow page ended the whole wait) counts as one try.
+  const seatOnFreshMap = () => reopenSeatMap(page2, testConfig.urls.home, show).then(() => seatState(page2, seatId), () => 'other' as const);
 
   try {
     await step("User 1 (main test account): choose tomorrow's show, sign in, choose General / Standard and open the seat map", async () => {
@@ -85,10 +88,7 @@ test('WEB-43 Same seat chosen by two users', async ({ page, step, testConfig, se
       // The seat map can show a just-held seat as free for up to about a minute (seen on UAT, 1 Oct 2026), so user 2
       // reopens the show every 15 s, for up to 2 minutes, until the seat is drawn as Unavailable.
       const started = Date.now();
-      await expect.soft.poll(async () => {
-        await reopenSeatMap(page2, testConfig.urls.home, show); // Same show, General / Standard, seat map.
-        return seatState(page2, seatId);
-      }, { message: `User 2: ${seatName} should be shown as Unavailable while user 1 holds it`, timeout: 120_000, intervals: [15_000] }).toBe('unavailable');
+      await expect.soft.poll(seatOnFreshMap, { message: `User 2: ${seatName} should be shown as Unavailable while user 1 holds it`, timeout: 120_000, intervals: [15_000] }).toBe('unavailable');
       testInfo.annotations.push({ type: 'seat map after the hold', description: `User 2 sees ${seatName} as "${await seatState(page2, seatId)}" ${Math.round((Date.now() - started) / 1000)} s after reopening.` });
       await shotOfUser2(`${seatName} while user 1 holds it`);
     });
@@ -97,8 +97,7 @@ test('WEB-43 Same seat chosen by two users', async ({ page, step, testConfig, se
       await cancelDuringBooking(page); // User 1: Cancel > Yes; the seat is released.
       await expect.poll(async () => { // User 2 reopens the show until the seat is free (up to 2 minutes).
         if (await seatState(page2, seatId) === 'available') return 'available';
-        await reopenSeatMap(page2, testConfig.urls.home, show);
-        return seatState(page2, seatId);
+        return seatOnFreshMap(); // Same show, General / Standard, seat map.
       }, { message: `${seatName} should be free for user 2 after user 1 cancels`, timeout: 120_000, intervals: [5_000] }).toBe('available');
       await clickSeat(page2, seatId); // User 2 selects it (no PROCEED, so nothing is held).
       expect(await seatState(page2, seatId), `User 2 should now be able to select ${seatName}`).toBe('selected');

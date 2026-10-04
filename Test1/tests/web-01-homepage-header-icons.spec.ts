@@ -8,6 +8,7 @@ import { HomePage } from '../pages/HomePage'; // Page object for the homepage he
 test.use({ launchOptions: { slowMo: 200 } });
 
 test('WEB-01 Homepage header icons', async ({ page, testConfig }, testInfo) => {
+  test.setTimeout(180_000); // Up to 3 minutes: the UAT homepage alone can take over 30 s to load.
   const homePage = new HomePage(page); // Helper object for the homepage header.
 
   await test.step('Load the Cinescape homepage', async () => {

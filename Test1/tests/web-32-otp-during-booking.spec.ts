@@ -1,4 +1,4 @@
-// WEB-35 OTP during booking - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-32 OTP during booking - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // While signed out, choosing a show asks the user to sign in: checks the email OTP step (wrong OTP, Clear, correct OTP)
 // and that the booking can carry on with the same date and show. Nothing is booked.
 // Not automated here: the bank OTP (3-D Secure) of a card payment - there is no test credit card for UAT.
@@ -8,7 +8,7 @@ import { chooseShow, dateTab, openShowTime, type Show } from '../pages/Booking';
 
 test.describe.configure({ timeout: 240_000 }); // Up to 4 minutes (sign-in on the slow UAT site).
 
-test('WEB-35 OTP during booking', async ({ page, step, testConfig }, testInfo) => {
+test('WEB-32 OTP during booking', async ({ page, step, testConfig }, testInfo) => {
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
   let show: Show; // The show chosen.

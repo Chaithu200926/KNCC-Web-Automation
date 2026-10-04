@@ -12,7 +12,7 @@ export interface TestConfig {
     password: string;
     pin: string;
   };
-  /** Second test account (no wallet balance, no payment methods): the second user in WEB-29 / 34 / 43, the empty wallet in WEB-49. */
+  /** Second test account (no wallet balance, no payment methods): the second user in WEB-29 / 31 / 38, the empty wallet in WEB-43. */
   secondAccount: {
     username: string;
     password: string;

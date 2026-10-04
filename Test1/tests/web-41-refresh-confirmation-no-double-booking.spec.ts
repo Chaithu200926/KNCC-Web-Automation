@@ -1,17 +1,18 @@
-// WEB-47 Refreshing the confirmation page does not book again - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-41 Refreshing the confirmation page does not book again - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Pays one ticket for tomorrow with the test wallet, then reloads the confirmation page and uses Back / Forward, and checks
 // no second booking or payment was made. Every booking made is cancelled at the end (the wallet is refunded).
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { readWalletBalance } from '../pages/BookingChecks'; // Wallet balance.
 import { // Booking steps (see pages/Booking.ts):
-  cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, payWithWallet, proceedFromSeatMap, proceedToSeatMap,
-  readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, upcomingBookingIds, type Show,
+  cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, payWithWallet, proceedToSeatMap,
+  proceedWithFreeSeats, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, upcomingBookingIds,
+  type Show,
 } from '../pages/Booking';
 
 test.describe.configure({ timeout: 360_000 }); // Up to 6 minutes (booking, reloads, checks and cancellation).
 const fils = (kwd: number) => Math.round(kwd * 1000); // KWD → fils (whole numbers).
 
-test('WEB-47 Refreshing the confirmation page does not book again', async ({ page, step, testConfig }, testInfo) => {
+test('WEB-41 Refreshing the confirmation page does not book again', async ({ page, step, testConfig }, testInfo) => {
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
   let show: Show; // The show chosen.
@@ -27,7 +28,8 @@ test('WEB-47 Refreshing the confirmation page does not book again', async ({ pag
     await chooseCategoryAndType(page); // General / Standard.
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // To the payment page.
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show); // PROCEED (other seats if one is held).
+    if (next === 'food') await skipFood(page); // To the payment page.
     await readPaymentSummary(page); // Payment summary loaded.
     ({ bookingId } = await payWithWallet(page)); // Pay; confirmation page.
     confirmationUrl = page.url(); // .../bookingconfirm?result=success...

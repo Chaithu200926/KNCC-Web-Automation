@@ -37,8 +37,13 @@ export class HomePage {
     this.promotionsSection = page.locator('section.promotions');
   }
 
+  /**
+   * Opens the homepage. The UAT site can take over 30 s to finish loading, so the page is opened without waiting for
+   * the whole load and is ready once the logo shows (up to 90 s) - a quick site passes straight through.
+   */
   async open(url = '/') {
-    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.goto(url, { waitUntil: 'commit', timeout: 90_000 });
+    await expect(this.logo).toBeVisible({ timeout: 90_000 });
   }
 
   async expectLoaded() {

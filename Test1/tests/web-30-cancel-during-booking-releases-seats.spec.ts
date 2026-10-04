@@ -3,7 +3,7 @@
 // Nothing is paid.
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedFromSeatMap, proceedToSeatMap, readPaymentSummary,
+  cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedToSeatMap, proceedWithFreeSeats, readPaymentSummary,
   reopenSeatMap, seatState, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
 } from '../pages/Booking';
 
@@ -20,8 +20,10 @@ test('WEB-30 Cancel during booking releases the seats', async ({ page, step, tes
     await signInAndReopenShow(page, testConfig.credentials, show); // Email, password, OTP; same show again.
     await chooseCategoryAndType(page); // General / Standard.
     await proceedToSeatMap(page); // Seat map.
-    [seatId] = await selectAvailableSeats(page, 1); // One free seat (its id, e.g. "0000000007|2|9|17").
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // To the payment page (the seat is now held).
+    await selectAvailableSeats(page, 1); // One free seat.
+    const { next, seats } = await proceedWithFreeSeats(page, testConfig.urls.home, show); // PROCEED (other seats if one is held).
+    [seatId] = seats; // The seat now held (its id, e.g. "0000000007|2|9|17").
+    if (next === 'food') await skipFood(page); // To the payment page.
     await readPaymentSummary(page); // Payment summary loaded.
   });
 

@@ -4,7 +4,7 @@
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { readKwdAfter } from '../pages/BookingChecks'; // Reads "KWD x.xxx" after a label.
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, chooseShowOfMovie, proceedFromSeatMap, proceedToSeatMap,
+  cancelDuringBooking, chooseCategoryAndType, chooseShow, chooseShowOfMovie, proceedToSeatMap, proceedWithFreeSeats,
   readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
 } from '../pages/Booking';
 
@@ -15,6 +15,7 @@ test('WEB-23 Half-price Monday', async ({ page, step, testConfig }, testInfo) =>
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
   let tuesday: Show; // The normal-price show.
+  let monday: Show | undefined; // The half-price show.
   let normalPrice = 0; // General / Standard price on Tuesday.
   let mondayPrice = 0; // The same on Monday.
 
@@ -26,7 +27,7 @@ test('WEB-23 Half-price Monday', async ({ page, step, testConfig }, testInfo) =>
   });
 
   await step('Open the same movie on Monday and check the General / Standard price is half', async () => {
-    const monday = await chooseShowOfMovie(page, testConfig.urls.home, tuesday.href, 'monday'); // Same movie, next Monday.
+    monday = await chooseShowOfMovie(page, testConfig.urls.home, tuesday.href, 'monday'); // Same movie, next Monday.
     test.skip(!monday, `${tuesday.movieTitle} has no daytime show next Monday.`); // Nothing to compare.
     await expect(page.getByText(/Select Seat Category/i).first()).toBeVisible({ timeout: 30_000 }); // Signed in: straight to seat category.
     mondayPrice = await chooseCategoryAndType(page); // Monday price, e.g. 1.750.
@@ -37,7 +38,8 @@ test('WEB-23 Half-price Monday', async ({ page, step, testConfig }, testInfo) =>
   await step('Choose a seat and check the payment summary charges the Monday price', async () => {
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // A future date goes straight to payment.
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, monday!); // PROCEED (other seats if this one is held).
+    if (next === 'food') await skipFood(page); // A future date goes straight to payment.
     const summary = await readPaymentSummary(page); // Payment page summary.
     expect.soft(fils(readKwdAfter(summary.text, 'Ticket Price')), 'Ticket Price should be the Monday price').toBe(fils(mondayPrice));
     expect.soft(fils(summary.total), 'Total amount to be paid should be the Monday price').toBe(fils(mondayPrice));

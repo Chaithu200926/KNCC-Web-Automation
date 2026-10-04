@@ -1,17 +1,17 @@
-// WEB-45 Movie details on the homepage and through booking - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-39 Movie details on the homepage and through booking - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Uses the test account; goes up to the payment summary and then cancels (nothing is paid).
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { expectMovieDetails, expectTicketMatchesChoice, readHomeMovieCard, readMovieDetails } from '../pages/BookingChecks'; // Detail checks.
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedFromSeatMap, proceedToSeatMap, readPaymentSummary,
+  cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedToSeatMap, proceedWithFreeSeats, readPaymentSummary,
   selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
 } from '../pages/Booking';
 import { openHome } from '../pages/WebSite'; // Opens the homepage.
 
 test.describe.configure({ timeout: 240_000 }); // Up to 4 minutes (sign-in and seat map on the slow UAT site).
 
-test('WEB-45 Movie details on the homepage and through booking', async ({ page, step, testConfig }, testInfo) => {
+test('WEB-39 Movie details on the homepage and through booking', async ({ page, step, testConfig }, testInfo) => {
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
   let show: Show; // The show chosen.
@@ -37,7 +37,8 @@ test('WEB-45 Movie details on the homepage and through booking', async ({ page, 
     await chooseCategoryAndType(page); // General / Standard.
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // Tomorrow: straight to payment (skip food if shown).
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show); // PROCEED (other seats if one is held).
+    if (next === 'food') await skipFood(page); // Tomorrow: straight to payment (skip food if shown).
     const summary = await readPaymentSummary(page); // Seat and total on the payment page.
     await expectTicketMatchesChoice(page.locator('body'), { ...show, location: 'Cinescape 360', category: 'General', seat: summary.seat }, 'Payment summary', 'summary');
   });

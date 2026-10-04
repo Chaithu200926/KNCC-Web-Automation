@@ -1,16 +1,17 @@
-// WEB-39 Cancel 2 hours or more before the show; wallet credited back - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-36 Cancel 2 hours or more before the show; wallet credited back - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Pays one ticket for tomorrow with the test wallet, cancels it, and checks the wallet gets the amount back.
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { hoursUntilShow, readWalletBalance } from '../pages/BookingChecks'; // 2-hour window and wallet balance.
 import { // Booking steps (see pages/Booking.ts):
-  bookingCard, cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, payWithWallet, proceedFromSeatMap,
-  proceedToSeatMap, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
+  bookingCard, cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, payWithWallet,
+  proceedToSeatMap, proceedWithFreeSeats, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood,
+  type Show,
 } from '../pages/Booking';
 
 test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (booking and cancellation).
 const fils = (kwd: number) => Math.round(kwd * 1000); // KWD → fils (whole numbers, no rounding surprises).
 
-test('WEB-39 Cancel 2 hours or more before the show; wallet credited back', async ({ page, step, testConfig }, testInfo) => {
+test('WEB-36 Cancel 2 hours or more before the show; wallet credited back', async ({ page, step, testConfig }, testInfo) => {
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
   let show: Show; // The show chosen.
@@ -23,7 +24,8 @@ test('WEB-39 Cancel 2 hours or more before the show; wallet credited back', asyn
     await chooseCategoryAndType(page); // General / Standard.
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // To the payment page.
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show); // PROCEED (other seats if one is held).
+    if (next === 'food') await skipFood(page); // To the payment page.
     await readPaymentSummary(page); // Wait for the order summary.
     booking = await payWithWallet(page); // Pay; confirmation page.
     expect(booking.grandTotal, 'The confirmation page should show the Grand Total').toBeDefined();

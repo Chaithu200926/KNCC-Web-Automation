@@ -5,8 +5,8 @@
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, clickSeat, closeOpenMessage, openMessage, proceedFromSeatMap,
-  proceedToSeatMap, seatIds, seatState, selectAvailableSeats, setTicketCount, signInAndReopenShow,
+  cancelDuringBooking, chooseCategoryAndType, chooseShow, clickSeat, closeOpenMessage, openMessage, proceedToSeatMap,
+  proceedWithFreeSeats, seatIds, seatState, selectAvailableSeats, setTicketCount, signInAndReopenShow, type Show,
 } from '../pages/Booking';
 
 test.describe.configure({ timeout: 240_000 }); // Up to 4 minutes (sign-in and seat map on the slow UAT site).
@@ -18,9 +18,10 @@ test('WEB-25 Seat map rules', async ({ page, step, testConfig }, testInfo) => {
   const selected = () => seatIds(page, 'selected'); // Ids of the seats chosen so far.
   const proceed = page.getByRole('button', { name: 'PROCEED', exact: true }).last(); // PROCEED under the seat map.
   let chosen: string[] = []; // The seats chosen.
+  let show: Show; // The show chosen.
 
   await step(`Choose tomorrow's show, sign in, choose ${TICKETS} General / Standard tickets and PROCEED to the seat map`, async () => {
-    const show = await chooseShow(page, testConfig.urls.home, 'tomorrow'); // A show tomorrow.
+    show = await chooseShow(page, testConfig.urls.home, 'tomorrow'); // A show tomorrow.
     await signInAndReopenShow(page, testConfig.credentials, show); // Email, password, OTP; same show again.
     await chooseCategoryAndType(page); // General / Standard.
     await setTicketCount(page, TICKETS); // 2 tickets.
@@ -79,7 +80,7 @@ test('WEB-25 Seat map rules', async ({ page, step, testConfig }, testInfo) => {
   await step(`Select a second seat again and check PROCEED continues (then cancel; nothing is paid)`, async () => {
     chosen = [chosen[1], ...await selectAvailableSeats(page, 1)]; // Back to 2 seats.
     expect(await selected(), `Exactly ${TICKETS} seats should be selected`).toHaveLength(TICKETS);
-    const next = await proceedFromSeatMap(page); // PROCEED: food page (today) or payment page (tomorrow).
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show, TICKETS); // PROCEED: food page (today) or payment page (tomorrow).
     testInfo.annotations.push({ type: 'after the seat map', description: `PROCEED went to the ${next} page.` });
     await cancelDuringBooking(page); // Cancel > Yes; the seats are released.
   });

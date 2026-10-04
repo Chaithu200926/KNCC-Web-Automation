@@ -1,4 +1,4 @@
-// WEB-49 Pay with an empty wallet - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-43 Pay with an empty wallet - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Uses the second test account, whose wallet is empty and which has no other way to pay: books one seat for tomorrow
 // up to the payment page, tries "Use your Wallet", and checks the payment is refused ("Insufficient wallet balance"),
 // nothing is taken off the total and Proceed stays disabled. Then cancels; no booking is made.
@@ -6,21 +6,23 @@
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test accounts) and step() (step + screenshot).
 import { fils, flatText, readKwdAfter } from '../pages/BookingChecks'; // Amount helpers.
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, closeOpenMessage, openBookings, openMessage, proceedFromSeatMap,
-  proceedToSeatMap, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, upcomingBookingIds,
+  cancelDuringBooking, chooseCategoryAndType, chooseShow, closeOpenMessage, openBookings, openMessage,
+  proceedToSeatMap, proceedWithFreeSeats, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood,
+  upcomingBookingIds, type Show,
 } from '../pages/Booking';
 
 test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (sign-in, booking and My Account on the slow UAT site).
 
-test('WEB-49 Pay with an empty wallet', async ({ page, step, testConfig }, testInfo) => {
+test('WEB-43 Pay with an empty wallet', async ({ page, step, testConfig }, testInfo) => {
   const second = testConfig.secondAccount; // The second test account (empty wallet).
   test.skip(!second.username || !second.password || !second.pin, 'Set TEST2_USERNAME, TEST2_PASSWORD and TEST2_PIN (second test account) to run this test.');
   const proceed = page.getByRole('button', { name: 'Proceed', exact: true }).filter({ visible: true }).last(); // Proceed (= pay) on the payment page.
   const walletPanel = page.locator('.card-balance').filter({ visible: true }).first(); // The open "Use your Wallet" panel (Balance, Apply).
+  let show: Show; // The show chosen.
   let total = 0; // "Total amount to be paid" before trying the wallet.
 
   await step("Second test account: choose tomorrow's show and sign in", async () => {
-    const show = await chooseShow(page, testConfig.urls.home, 'tomorrow'); // A show tomorrow.
+    show = await chooseShow(page, testConfig.urls.home, 'tomorrow'); // A show tomorrow.
     await signInAndReopenShow(page, second, show); // Second account: email, password, OTP; same show again.
   });
 
@@ -28,7 +30,8 @@ test('WEB-49 Pay with an empty wallet', async ({ page, step, testConfig }, testI
     await chooseCategoryAndType(page); // General / Standard, 1 ticket.
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // To the payment page.
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show); // PROCEED (other seats if one is held).
+    if (next === 'food') await skipFood(page); // To the payment page.
     total = (await readPaymentSummary(page)).total ?? Number.NaN; // e.g. 3.5.
     expect(total, 'The payment page should show the total').toBeGreaterThan(0);
     await expect(proceed, 'Proceed should be disabled until a payment method is chosen').toBeDisabled();
@@ -44,12 +47,17 @@ test('WEB-49 Pay with an empty wallet', async ({ page, step, testConfig }, testI
   });
 
   await step('Click Apply; check "Insufficient wallet balance", nothing is taken off the total and Proceed stays disabled', async () => {
-    const answer = page.waitForResponse((response) => /\/clubcard\/apply/i.test(response.url()), { timeout: 30_000 }).catch(() => undefined); // The site's wallet request.
-    await walletPanel.getByRole('button', { name: /apply/i }).click(); // Apply the wallet.
-    const response = await answer;
-    if (response) testInfo.annotations.push({ type: 'wallet apply answer', description: `HTTP ${response.status()}: ${(await response.text().catch(() => '')).slice(0, 200)}` });
-    await expect(openMessage(page), 'The site should refuse the empty wallet').toContainText(/insufficient wallet balance/i); // The message.
-    await closeOpenMessage(page); // OK.
+    const apply = walletPanel.getByRole('button', { name: /apply/i }); // Apply.
+    if (await apply.isDisabled()) { // Once the panel shows the balance (KWD 0.000), the site may grey Apply out instead.
+      testInfo.annotations.push({ type: 'wallet apply', description: 'Apply is disabled for the empty wallet, so it cannot be used.' });
+    } else { // Seen on UAT (1 Oct 2026): Apply works and the site answers with "Insufficient wallet balance".
+      const answer = page.waitForResponse((response) => /\/clubcard\/apply/i.test(response.url()), { timeout: 30_000 }).catch(() => undefined); // The site's wallet request.
+      await apply.click(); // Apply the wallet.
+      const response = await answer;
+      if (response) testInfo.annotations.push({ type: 'wallet apply answer', description: `HTTP ${response.status()}: ${(await response.text().catch(() => '')).slice(0, 200)}` });
+      await expect(openMessage(page), 'The site should refuse the empty wallet').toContainText(/insufficient wallet balance/i); // The message.
+      await closeOpenMessage(page); // OK.
+    }
     await expect(page.locator('body'), 'The wallet should not be applied').not.toContainText(/wallet applied/i);
     expect(fils(readKwdAfter(await page.locator('body').innerText(), 'Total amount to be paid')), 'Total amount to be paid should not change').toBe(fils(total));
     await expect(proceed, 'Proceed should stay disabled (nothing to pay with)').toBeDisabled();

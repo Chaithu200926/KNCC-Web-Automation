@@ -8,7 +8,7 @@ import { HomePage } from '../pages/HomePage'; // Page object for the homepage (o
 test.use({ launchOptions: { slowMo: 200 } });
 
 test('WEB-02 Homepage footer links navigation', async ({ page, testConfig }, testInfo) => {
-  test.setTimeout(180_000); // 17 links, each opened and closed: allow up to 3 minutes.
+  test.setTimeout(300_000); // 17 links, each opened and the homepage reloaded after it: up to 5 minutes on the slow UAT site.
   const homePage = new HomePage(page); // Helper object for the homepage.
   const footer = page.locator('footer:not(.footer-mobile):visible'); // The desktop footer (the mobile copy is hidden).
   // MORE LINKS: link text as shown, and the page each one should open on this site.

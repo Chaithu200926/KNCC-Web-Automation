@@ -1,18 +1,18 @@
-// WEB-48 KNET booking refunded to the wallet after cancelling - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-42 KNET booking refunded to the wallet after cancelling - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Pays one ticket for tomorrow with the KNET test card, cancels it, and checks the amount is credited to the wallet
 // (a cancelled KNET booking is refunded to the customer's wallet). No trace is recorded (it would hold the card details).
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, account, card) and step() (step + screenshot).
 import { flatText, readWalletBalance } from '../pages/BookingChecks'; // Text and wallet helpers.
 import { // Booking steps (see pages/Booking.ts):
-  cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, payWithKnet, proceedFromSeatMap, proceedToSeatMap,
-  readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
+  cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, payWithKnet, proceedToSeatMap,
+  proceedWithFreeSeats, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
 } from '../pages/Booking';
 
 test.use({ trace: 'off' }); // Traces record typed text, which here would include the KNET card number and PIN.
 test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (KNET gateway and cancellation).
 const fils = (kwd: number) => Math.round(kwd * 1000); // KWD → fils (whole numbers).
 
-test('WEB-48 KNET booking refunded to the wallet after cancelling', async ({ page, step, testConfig }) => {
+test('WEB-42 KNET booking refunded to the wallet after cancelling', async ({ page, step, testConfig }) => {
   const { username, password, pin } = testConfig.credentials;
   const { knetNumber, knetExpiry, knetPin } = testConfig.payment;
   test.skip(!username || !password || !pin || !knetNumber || !knetExpiry || !/^\d{4}$/.test(knetPin),
@@ -27,7 +27,8 @@ test('WEB-48 KNET booking refunded to the wallet after cancelling', async ({ pag
     await chooseCategoryAndType(page); // General / Standard.
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // To the payment page.
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show); // PROCEED (other seats if one is held).
+    if (next === 'food') await skipFood(page); // To the payment page.
     await readPaymentSummary(page); // Wait for the order summary.
     booking = await payWithKnet(page, { knetNumber, knetExpiry, knetPin }); // KNET test gateway; confirmation page.
     expect(flatText(await page.locator('body').innerText()), 'Payment Mode should be Knet').toMatch(/Payment Mode\s*Knet/i);

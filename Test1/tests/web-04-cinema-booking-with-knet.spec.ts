@@ -5,6 +5,11 @@
 import type { Locator } from '@playwright/test'; // Type for element locators (used in helper signatures).
 import { test, expect } from './fixtures'; // Shared test setup: gives each test the `testConfig` settings.
 import { HomePage } from '../pages/HomePage'; // Page object for the homepage (Book Now links, highlight helper).
+import { titlePattern } from '../pages/BookingChecks'; // Flexible movie title pattern.
+import { // Shared booking steps (see pages/Booking.ts):
+  bookingCard, noteCancelledBooking, notePaidBooking, openBookings, proceedWithFreeSeats, seat, selectAvailableSeats,
+  type Show,
+} from '../pages/Booking';
 
 // Slow every browser action down by 300 ms so the recorded video is easy to follow.
 // Traces are switched off for this test because a trace records the text typed into fields,
@@ -35,6 +40,7 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
   let selectedShowDate = ''; // Text of the date tab chosen (tomorrow), used to verify the booking date.
   let selectedShowTime = ''; // Text of the showtime chosen, used to click the same showtime after sign-in.
   let confirmedBookingId = ''; // Booking ID shown on the confirmation page, used to check the cancellation.
+  let movieUrl = ''; // Movie page address (to open the show again if a seat has to be chosen again).
 
   // Clean text read from the page: unify characters and remove invisible direction/space marks.
   const normalizeVisibleText = (text: string) => text
@@ -101,7 +107,7 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
 
     const otpDialog = page.locator('[role="dialog"]:visible').last(); // The OTP pop-up that follows.
     const otpInputs = otpDialog.locator('input[type="tel"]'); // One box per OTP digit.
-    await expect(otpInputs.first()).toBeVisible(); // Wait for the OTP boxes.
+    await expect(otpInputs.first()).toBeVisible({ timeout: 60_000 }); // Wait for the OTP boxes (sign-in can take up to a minute on UAT).
     await captureStep('08-email-otp-form', otpInputs.first(), 'STEP 8 - ENTER EMAIL OTP'); // Screenshot them.
     for (let index = 0; index < await otpInputs.count(); index += 1) {
       await hideInputValueInVideo(otpInputs.nth(index)); // Hide every OTP box's value.
@@ -129,6 +135,7 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     await clickWithHighlight('01-movie-book-now', homePage.bookNowLinks.first(), 'STEP 1 - CLICK BOOK NOW'); // Open the first movie.
     await page.waitForLoadState('domcontentloaded'); // Wait for the movie sessions page.
     await expect(page).toHaveURL(/\/moviesessions\//); // Confirm we are on the sessions page.
+    movieUrl = page.url(); // Remember its address.
     movieTitle = decodeURIComponent(new URL(page.url()).pathname.split('/')[2] ?? '') // Movie name part of the URL,
       .replace(/[-()]+/g, ' ') // with dashes and brackets turned into spaces,
       .replace(/\s+/g, ' ') // repeated spaces collapsed,
@@ -216,18 +223,11 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     await clickWithHighlight('13-ticket-proceed', ticketProceed, 'STEP 13 - PROCEED TO SEAT MAP'); // Click it.
     await expect(page).toHaveURL(/\/seatlayout$/); // The seat map page opens.
 
-    const seatCandidates = page.locator('.seat[id]:visible').filter({ has: page.locator('img') }); // Seats with an icon.
-    await expect(seatCandidates.first()).toBeVisible(); // Wait for the seat map.
-    let selectedSeat = seatCandidates.first(); // Fallback: the first seat.
-    const seatCount = await seatCandidates.count(); // Number of seats.
-    for (let index = 0; index < seatCount; index += 1) {
-      const candidate = seatCandidates.nth(index); // Try each seat in turn.
-      await candidate.locator('img').first().click({ force: true }); // Click the seat icon.
-      if (await candidate.evaluate((element) => element.classList.contains('active'))) { // Seat became selected:
-        selectedSeat = candidate; // keep it,
-        break; // and stop (taken seats do not become "active").
-      }
-    }
+    await expect(page.locator('.seat[id]').first()).toBeVisible({ timeout: 30_000 }); // Wait for the seat map.
+    // A free seat picked at random (not the first one): unpaid bookings abandoned by earlier runs can hold seats for over
+    // 30 minutes on UAT (seen 1 Oct 2026), and this account still sees them as free.
+    const [seatId] = await selectAvailableSeats(page, 1);
+    const selectedSeat = seat(page, seatId); // The chosen seat.
     await captureStep('14-seat', selectedSeat, 'STEP 14 - CHOOSE AVAILABLE SEAT'); // Screenshot the chosen seat.
     await expect(selectedSeat).toHaveClass(/active/); // Confirm a seat is selected.
 
@@ -235,8 +235,12 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     await expect(seatProceed).toBeEnabled(); // It is enabled once a seat is chosen.
     await seatProceed.scrollIntoViewIfNeeded(); // Scroll to it.
     await captureStep('15-seat-proceed', seatProceed, 'STEP 15 - PROCEED FROM SEAT MAP'); // Screenshot it.
-    await seatProceed.click(); // Click it.
-    await expect(page).toHaveURL(/\/(?:food|payment)\//, { timeout: 30_000 }); // Food page or straight to payment.
+    // PROCEED. If the site asks "Bookings Found!" (this account already has a booking for the show) it books again
+    // anyway; if the seat turns out to be held by someone else, it tries other free seats (up to 3 times).
+    const url = new URL(movieUrl); // The movie page address.
+    const show: Show = { movieTitle, title: titlePattern(movieTitle), language: url.searchParams.get('language') ?? '',
+      href: `${url.pathname}${url.search}`, day: selectedShowDate.match(/\d{1,2}/)?.[0] ?? '', time: selectedShowTime };
+    await proceedWithFreeSeats(page, testConfig.urls.home, show); // Food page or straight to payment.
   });
 
   await test.step('Skip food and continue to payment', async () => {
@@ -294,7 +298,7 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     const expiryInput = page.getByPlaceholder('MM/YY').filter({ visible: true }).first(); // "Expiration Date" (MM/YY) box.
     const pinInput = page.locator('input[title*="PIN" i]').filter({ visible: true }).first(); // "PIN" box ("The PIN must be 4 digits").
 
-    await expect(cardNumberInput).toBeVisible({ timeout: 30_000 }); // KNET card form is shown.
+    await expect(cardNumberInput).toBeVisible({ timeout: 60_000 }); // KNET card form is shown (the KNET test gateway can be slow: seen on CI, 1 Oct 2026).
     await expect(expiryInput).toBeVisible(); // Expiry box is there.
     await expect(pinInput).toBeVisible(); // PIN box is there.
     await captureStep('19a-knet-page', cardNumberInput, 'STEP 19A - KNET PAYMENT PAGE'); // Screenshot the empty form.
@@ -337,6 +341,7 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     const bookingIdValue = bookingIdLabel.locator('..').getByRole('heading').first(); // The ID shown next to it.
     await expect(bookingIdValue).toBeVisible(); // Wait for the ID.
     confirmedBookingId = normalizeVisibleText(await bookingIdValue.innerText()); // Remember the booking ID.
+    if (/^[A-Z0-9]{5,}$/.test(confirmedBookingId)) notePaidBooking(page, confirmedBookingId); // Cancelled afterwards even if a check fails.
     expect(bookedDay, `Booking date should match the selected show date "${selectedShowDate}"`).toBe(selectedDay); // Right day?
     expect(confirmedBookingId, 'The confirmation page should show a booking ID').not.toBe(''); // ID present?
     if (!bookedDay) { // If the day could not be read, attach the page text to help debugging.
@@ -356,24 +361,24 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     const profileLink = page.locator('a[href="/myaccount"], nav.header-nav .user-profile:visible').first(); // Profile link in the header.
     await expect(profileLink).toBeVisible(); // Wait for it.
     await clickWithHighlight('21-my-profile', profileLink, 'STEP 21 - OPEN MY PROFILE'); // Open My Profile.
-    await expect(page).toHaveURL(/\/myaccount/); // Account page opens.
-    await expect(page.locator('body')).toContainText(/welcome back|my account/i); // Account page content is shown.
+    // Seen on CI (1 Oct 2026): after a payment the header link sometimes did not respond; then open My Account directly.
+    const opened = await expect(page).toHaveURL(/\/myaccount/, { timeout: 30_000 }).then(() => true, () => false);
+    if (!opened) await page.goto(new URL('/myaccount', testConfig.urls.home).toString(), { waitUntil: 'commit' });
+    await expect(page.locator('body')).toContainText(/welcome back|my account/i, { timeout: 30_000 }); // Account page content is shown.
     await captureStep('22-my-profile', page.locator('body'), 'STEP 22 - MY PROFILE OPENED'); // Screenshot it.
 
     const bookingsTab = page.getByText(/^bookings$/i).first(); // "Bookings" tab.
     await expect(bookingsTab).toBeVisible(); // Wait for it.
     await clickWithHighlight('23-bookings', bookingsTab, 'STEP 23 - OPEN BOOKINGS'); // Open it.
-    const titlePattern = movieTitle // Build a flexible pattern from the movie title:
-      .split(/\s+/) // split it into words,
-      .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) // escape special characters,
-      .join('[\\s()-]*'); // and allow spaces, dashes or brackets between words.
-    await expect(page.locator('body')).toContainText(new RegExp(titlePattern, 'i')); // The new booking is listed.
+    const movie = titlePattern(movieTitle); // Flexible pattern of the movie title.
+    await expect(page.locator('body')).toContainText(movie, { timeout: 30_000 }); // The new booking is listed.
     await captureStep('24-booking-found', page.locator('body'), 'STEP 24 - FIND NEW MOVIE BOOKING'); // Screenshot it.
 
-    const cancelBooking = page.locator('button:visible, a:visible')
-      .filter({ hasText: /cancel booking|cancel/i }) // "Cancel booking" button/link,
-      .first(); // on the first (newest) booking.
-    await expect(cancelBooking).toBeVisible(); // Wait for it.
+    // This booking's own card, found by its Booking ID (not simply the first Cancel button on the page: the account can
+    // have other bookings too, e.g. one left by another test).
+    const cancelBooking = bookingCard(page, confirmedBookingId, movie)
+      .locator('button:visible, a:visible').filter({ hasText: /cancel booking/i }).first(); // Its "Cancel Booking".
+    await expect(cancelBooking).toBeVisible({ timeout: 30_000 }); // Wait for it.
     await clickWithHighlight('25-cancel-booking', cancelBooking, 'STEP 25 - CANCEL BOOKING'); // Click it.
 
     const confirmCancel = page.locator('button:visible').filter({ hasText: /yes,?\s*I.?m sure|confirm|cancel booking/i }).last(); // "Yes, I'm sure".
@@ -386,20 +391,11 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     await clickWithHighlight('26-confirm-cancellation', confirmCancel, 'STEP 26 - CONFIRM CANCELLATION'); // Confirm.
     const cancellationResponse = await cancellationResponsePromise; // Wait for the cancel API answer.
     expect(cancellationResponse.ok(), 'The booking cancellation request should succeed').toBeTruthy(); // It must succeed.
-    await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 }); // Site returns to the homepage.
-    const profileAfterCancellation = page.locator('a[href="/myaccount"]').first(); // Profile link again.
-    await expect(profileAfterCancellation).toBeVisible(); // Wait for it.
-    await profileAfterCancellation.click(); // Open My Profile.
-    await expect(page).toHaveURL(/\/myaccount/); // Account page opens.
-    const bookingsAfterCancellation = page.getByText(/^bookings$/i).first(); // "Bookings" tab.
-    await expect(bookingsAfterCancellation).toBeVisible(); // Wait for it.
-    await bookingsAfterCancellation.click(); // Open it.
-    await expect(page.locator('body')).toContainText(/upcoming bookings|no bookings|no upcoming/i, { timeout: 15_000 }); // List loaded.
-    if (confirmedBookingId) {
-      await expect(page.locator('body')).not.toContainText(confirmedBookingId); // The cancelled booking ID is gone.
-    } else {
-      await expect(page.locator('body')).not.toContainText(new RegExp(titlePattern, 'i')); // Or: the movie is no longer listed.
-    }
+    noteCancelledBooking(page, confirmedBookingId); // Nothing left for the clean-up.
+    // Seen on UAT (Sep - Oct 2026): after cancelling, the site jumps to the homepage. In case it stays on My Account
+    // instead, My Account > BOOKINGS is opened again from wherever the site is now.
+    await openBookings(page); // My Account > BOOKINGS (UPCOMING BOOKINGS).
+    await expect(page.locator('body')).not.toContainText(confirmedBookingId, { timeout: 30_000 }); // The cancelled booking ID is gone.
     await captureStep(
       '27-booking-cancelled',
       page.locator('body'),

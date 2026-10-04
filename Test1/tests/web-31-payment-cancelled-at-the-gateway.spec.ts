@@ -1,4 +1,4 @@
-// WEB-34 Payment fails or is cancelled at the gateway - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-31 Payment fails or is cancelled at the gateway - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Signs in, notes the wallet balance and upcoming bookings, books one seat for tomorrow up to KNET, clicks Cancel on the
 // KNET test gateway, and checks: no booking, no charge, and (with the second test account) the seat is free again.
 // No card details are typed.
@@ -7,15 +7,15 @@ import { flatText, readWalletBalance } from '../pages/BookingChecks'; // Text an
 import { appears, openHome } from '../pages/WebSite'; // Opens the homepage; waits for a pop-up.
 import { signIn } from '../pages/Account'; // Sign-in from the header.
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, clickShowSignedOut, openBookings, proceedFromSeatMap,
-  proceedToSeatMap, readPaymentSummary, seatLabel, selectAvailableSeats, signInAndReopenShow, skipFood, startKnetPayment,
+  cancelDuringBooking, chooseCategoryAndType, chooseShow, clickShowSignedOut, openBookings, proceedToSeatMap,
+  proceedWithFreeSeats, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, startKnetPayment,
   tryToReserveSeat, upcomingBookingIds, type Show,
 } from '../pages/Booking';
 
 test.describe.configure({ timeout: 420_000 }); // Up to 7 minutes (two sign-ins, the gateway and checks on the slow UAT site).
 const fils = (kwd: number) => Math.round(kwd * 1000); // KWD → fils (whole numbers).
 
-test('WEB-34 Payment fails or is cancelled at the gateway', async ({ page, step, testConfig, secondUser }, testInfo) => {
+test('WEB-31 Payment fails or is cancelled at the gateway', async ({ page, step, testConfig, secondUser }, testInfo) => {
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
   let show: Show; // The show chosen.
@@ -37,9 +37,11 @@ test('WEB-34 Payment fails or is cancelled at the gateway', async ({ page, step,
     await expect(page.getByText(/Select Seat Category/i).first()).toBeVisible({ timeout: 30_000 });
     await chooseCategoryAndType(page); // General / Standard.
     await proceedToSeatMap(page); // Seat map.
-    [seatId] = await selectAvailableSeats(page, 1); // One free seat.
-    seatName = await seatLabel(page, seatId); // e.g. "D3" (read while the seat map is open).
-    if (await proceedFromSeatMap(page) === 'food') await skipFood(page); // To the payment page.
+    await selectAvailableSeats(page, 1); // One free seat.
+    const { next, seats, names } = await proceedWithFreeSeats(page, testConfig.urls.home, show); // PROCEED (other seats if one is held).
+    [seatId] = seats; // The seat now held,
+    [seatName] = names; // e.g. "D3".
+    if (next === 'food') await skipFood(page); // To the payment page.
     await readPaymentSummary(page); // Payment summary loaded.
   });
 

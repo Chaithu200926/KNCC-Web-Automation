@@ -1,4 +1,4 @@
-// WEB-41 Preferences - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-37 Preferences - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Uses the test account from .env. Nothing is saved (changes are cancelled; registration and password changes are out of scope).
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
 import type { BrowserContext } from '@playwright/test'; // Type of a browser window (used for a saved session).
@@ -18,7 +18,7 @@ test.beforeEach(({ testConfig }) => {
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run the account tests.');
 });
 
-test('WEB-41 Preferences', async ({ page, step, testConfig }) => {
+test('WEB-37 Preferences', async ({ page, step, testConfig }) => {
   // The PREFERENCES form (the header menu has its own "EXPERIENCE" link, so checks stay inside the form).
   const prefs = page.locator('div').filter({ visible: true }).filter({ hasText: /choose your preference/i }).filter({ has: page.locator('select') }).last();
   const ageRating = prefs.locator('input[type="checkbox"]'); // AGE RATING checkboxes (G, PG, 13+, 18+); styled, so not "visible".

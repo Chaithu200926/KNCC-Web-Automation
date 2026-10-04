@@ -1,4 +1,4 @@
-// WEB-46 Cinema location map links - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-40 Cinema location map links - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // No sign-in; the test only reads the site. "Soft" checks (expect.soft) report a problem but let the test carry on.
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site address) and step() (step + screenshot).
 import { openHome } from '../pages/WebSite'; // Opens the homepage and waits for the movie list.
@@ -8,7 +8,7 @@ test.describe.configure({ timeout: 180_000 }); // The test may take up to 3 minu
 /** "lat,lng" from a Google Maps address such as https://www.google.com/maps?q=29.2678,47.9919 (undefined if none). */
 const mapsCoordinates = (url: string) => decodeURIComponent(url).match(/google\.[a-z.]+\/maps\S*?[?&]q=(-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?)/i)?.[1];
 
-test('WEB-46 Cinema location map links', async ({ page, step, testConfig }, testInfo) => {
+test('WEB-40 Cinema location map links', async ({ page, step, testConfig }, testInfo) => {
   let popupPlace: string | undefined; // Coordinates shown by the Locations page map.
 
   await step('Open the footer LOCATIONS link and check the cinema is listed', async () => {

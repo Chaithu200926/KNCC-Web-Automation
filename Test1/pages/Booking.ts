@@ -1,4 +1,4 @@
-// Booking steps shared by the website booking test cases (WEB-23..WEB-48): choose a show, sign in when asked,
+// Booking steps shared by the website booking test cases (WEB-03..WEB-43): choose a show, sign in when asked,
 // choose seat category / type / quantity / seats, go on to the food or payment page, pay with the wallet,
 // cancel during booking, and cancel a confirmed booking in My Profile.
 // The steps follow the proven wallet booking test (WEB-03, web-03-cinema-booking-with-wallet.spec.ts).
@@ -224,9 +224,10 @@ export async function clickSeat(page: Page, id: string) {
 /**
  * Selects `count` available seats, picked at random, and returns their ids. Random, not front-first: an unpaid booking
  * left by an earlier run can hold seats for over 30 minutes on UAT, and the same account still sees them as free.
+ * Seats in `avoid` (e.g. ones the site already refused) are not chosen.
  */
-export async function selectAvailableSeats(page: Page, count: number) {
-  const free = await seatIds(page, 'available'); // Free seats, in map order.
+export async function selectAvailableSeats(page: Page, count: number, avoid: string[] = []) {
+  const free = (await seatIds(page, 'available')).filter((id) => !avoid.includes(id)); // Free seats, in map order.
   for (let i = free.length - 1; i > 0; i -= 1) { // Shuffle them.
     const j = Math.floor(Math.random() * (i + 1));
     [free[i], free[j]] = [free[j], free[i]];
@@ -252,9 +253,9 @@ export async function closeOpenMessage(page: Page) {
 
 /**
  * Signed in: opens the same show again (movie page, Cinescape 360, date, show time), chooses General / Standard
- * and goes to its seat map. Used to see whether seats held earlier are free again.
+ * (and `tickets` tickets) and goes to its seat map. Used to see whether seats held earlier are free again.
  */
-export async function reopenSeatMap(page: Page, baseUrl: string, show: Show) {
+export async function reopenSeatMap(page: Page, baseUrl: string, show: Show, tickets = 1) {
   await page.goto(new URL(show.href, baseUrl).toString(), { waitUntil: 'commit' }); // Movie page.
   await expect(dateTabs(page).nth(1)).toBeVisible({ timeout: 60_000 }); // Date tabs.
   await page.locator('#cinema0000000001, .cinemacarousal').filter({ hasText: /Cinescape 360/i }).first().click(); // Cinescape 360.
@@ -263,6 +264,7 @@ export async function reopenSeatMap(page: Page, baseUrl: string, show: Show) {
   await expect(tab).toHaveAttribute('aria-selected', 'true');
   await openShowTime(page, show.time); // Same show time; "Select Seat Category".
   await chooseCategoryAndType(page); // General / Standard.
+  if (tickets > 1) await setTicketCount(page, tickets); // Same number of tickets as before.
   await proceedToSeatMap(page); // Seat map.
 }
 
@@ -300,15 +302,50 @@ export const bookingsFoundDialog = (page: Page) => page.locator('[role="dialog"]
  * Clicks PROCEED under the seat map and reports what happened: 'food' or 'payment' (the seats are now reserved), or
  * 'refused'. Seen on UAT (1 Oct 2026) when a seat is held by someone else: the reservation answer is empty and the
  * site shows a blank /login page with no message. (The seat map itself may still show such a seat as Available.)
+ * A message that keeps the user on the seat map (e.g. "seat not available", the expected behaviour) also counts as
+ * 'refused', so this keeps working once the blank page is fixed.
  */
 export async function tryProceedFromSeatMap(page: Page): Promise<'food' | 'payment' | 'refused'> {
   await page.getByRole('button', { name: 'PROCEED', exact: true }).last().click(); // PROCEED.
   const bookingsFound = bookingsFoundDialog(page); // Shown when the account already has a booking for this show.
-  await expect.poll(async () => !/\/seatlayout/.test(page.url()) || await bookingsFound.isVisible(), { timeout: 30_000 }).toBe(true);
-  if (await bookingsFound.isVisible()) await bookingsFound.getByRole('button', { name: /continue booking/i }).click(); // Book again anyway.
-  await expect(page).not.toHaveURL(/\/seatlayout/, { timeout: 30_000 }); // The site leaves the seat map either way.
+  const message = page.locator('.swal-overlay--show-modal .swal-modal, .swal2-popup').filter({ visible: true }).first(); // A message on the seat map.
+  const leftOrMessage = async () => !/\/seatlayout/.test(page.url()) || await message.isVisible(); // The site has answered.
+  await expect.poll(async () => await leftOrMessage() || await bookingsFound.isVisible(), { timeout: 30_000 }).toBe(true);
+  if (await bookingsFound.isVisible()) { // Book again anyway:
+    await bookingsFound.getByRole('button', { name: /continue booking/i }).click(); // Continue booking,
+    await expect.poll(leftOrMessage, { timeout: 30_000 }).toBe(true); // then wait for the answer.
+  }
+  if (/\/seatlayout/.test(page.url())) { // Still on the seat map, with a message: the seats were not reserved.
+    await message.getByRole('button').first().click().catch(() => undefined); // OK.
+    return 'refused';
+  }
   if (/\/food\//.test(page.url())) return 'food';
   return /\/payment\//.test(page.url()) ? 'payment' : 'refused';
+}
+
+/**
+ * Clicks PROCEED with the seats selected on the seat map of `show`. If the site refuses them because someone else holds
+ * them (seen on UAT, 1 Oct 2026: an unpaid booking abandoned by an earlier run can hold seats for over 30 minutes, and
+ * this account still sees them as free), it opens the seat map again and tries other free seats, up to 3 times in all.
+ * When no seat is held the first PROCEED goes through, as before. Returns where the site went next ('food' / 'payment'),
+ * the seats reserved (ids and names as on the ticket, e.g. "K18") and the names of any seats refused on the way.
+ */
+export async function proceedWithFreeSeats(page: Page, baseUrl: string, show: Show, tickets = 1) {
+  const refusedIds: string[] = []; // Seats the site would not reserve.
+  const refused: string[] = []; // Their names.
+  for (let attempt = 1; ; attempt += 1) {
+    const seats = await seatIds(page, 'selected'); // The seats chosen.
+    const names: string[] = [];
+    for (const id of seats) names.push(await seatLabel(page, id)); // e.g. "K18" (read while the seat map is open).
+    const next = await tryProceedFromSeatMap(page); // PROCEED.
+    if (next !== 'refused') return { next, seats, names, refused };
+    refusedIds.push(...seats);
+    refused.push(...names);
+    expect(attempt, `The site refused seat(s) ${refused.join(', ')} (now on ${new URL(page.url()).pathname}). Unpaid bookings `
+      + 'abandoned earlier may still hold them: on UAT such holds outlast the 4-minute timer.').toBeLessThan(3);
+    await reopenSeatMap(page, baseUrl, show, tickets); // Fresh seat map of the same show.
+    await selectAvailableSeats(page, tickets, refusedIds); // Other free seats.
+  }
 }
 
 /**
@@ -363,6 +400,12 @@ function rememberPaid<T extends { bookingId: string }>(page: Page, booking: T) {
 
 /** Booking IDs paid in this page that have not been cancelled (used by the clean-up in tests/fixtures.ts). */
 export const paidNotCancelled = (page: Page) => [...(paidBookings.get(page) ?? [])];
+
+/** Notes a booking paid by a test's own steps (WEB-03 / WEB-04), so the clean-up cancels it if the test stops early. */
+export const notePaidBooking = (page: Page, bookingId: string) => { rememberPaid(page, { bookingId }); };
+
+/** Notes that a test's own steps cancelled a booking (nothing left to clean up). */
+export const noteCancelledBooking = (page: Page, bookingId: string) => { paidBookings.get(page)?.delete(bookingId); };
 
 /** Pays with "Use your Wallet" and waits for the confirmation page; returns the Booking ID, date & time and Grand Total. */
 export async function payWithWallet(page: Page) {

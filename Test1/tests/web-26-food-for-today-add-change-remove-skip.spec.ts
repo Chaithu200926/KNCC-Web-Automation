@@ -6,7 +6,7 @@
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { fils } from '../pages/BookingChecks'; // KWD → fils.
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedFromSeatMap, proceedToSeatMap, readPaymentSummary,
+  cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedToSeatMap, proceedWithFreeSeats, readPaymentSummary,
   reopenSeatMap, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
 } from '../pages/Booking';
 import { // Food page steps (see pages/Food.ts):
@@ -35,7 +35,8 @@ test("WEB-26 Food for today's show: add, change, remove, skip", async ({ page, s
     await chooseCategoryAndType(page); // General / Standard, 1 ticket.
     await proceedToSeatMap(page); // Seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    expect(await proceedFromSeatMap(page), "Today's show should offer food").toBe('food'); // The food page opens.
+    const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show!); // PROCEED (other seats if one is held).
+    expect(next, "Today's show should offer food").toBe('food'); // The food page opens.
     ticketsTotal = (await openedFoodPage(page)) ?? Number.NaN; // TOTAL = the ticket, e.g. 3.5.
     testInfo.annotations.push({ type: 'show', description: `${show!.movieTitle}, today ${show!.time}; ticket KWD ${ticketsTotal.toFixed(3)}.` });
   });
@@ -88,7 +89,7 @@ test("WEB-26 Food for today's show: add, change, remove, skip", async ({ page, s
     await cancelDuringBooking(page); // Cancel > Yes; the seat is released.
     await reopenSeatMap(page, testConfig.urls.home, show!); // Same show, General / Standard, seat map.
     await selectAvailableSeats(page, 1); // One free seat.
-    expect(await proceedFromSeatMap(page), 'The food page should open again').toBe('food');
+    expect((await proceedWithFreeSeats(page, testConfig.urls.home, show!)).next, 'The food page should open again').toBe('food');
     await skipFood(page); // SKIP & PROCEED; payment page.
     const summary = await readPaymentSummary(page); // Order summary.
     expect.soft(fils(summary.food), 'Payment page: no food price').toBe(0);

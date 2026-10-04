@@ -1,4 +1,4 @@
-// WEB-38 Booking history - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
+// WEB-35 Booking history - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Uses the test account from .env. Nothing is saved (changes are cancelled; registration and password changes are out of scope).
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
 import type { BrowserContext } from '@playwright/test'; // Type of a browser window (used for a saved session).
@@ -18,7 +18,7 @@ test.beforeEach(({ testConfig }) => {
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run the account tests.');
 });
 
-test('WEB-38 Booking history', async ({ page, step, testConfig }) => {
+test('WEB-35 Booking history', async ({ page, step, testConfig }) => {
   // History cards; food-only orders have no seats, so the first ticket booking (with seats) is checked.
   const ticketCard = page.locator('.movie_section').filter({ visible: true }).filter({ hasText: /seats/i }).first();
   await step('Sign in and open My Account > HISTORY', async () => {
