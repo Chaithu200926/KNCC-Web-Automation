@@ -1,4 +1,4 @@
-# CINESCAPE WEB Testing: runs every automated website test case (WEB-01..WEB-44, one spec file per case in
+# CINESCAPE WEB Testing: runs every automated website test case (WEB-01..WEB-45, one spec file per case in
 # Test1/tests/web-NN-*.spec.ts) against the Cinescape UAT website, one test at a time, each in a new incognito
 # browser context, and publishes the results:
 #   * a results table on the run page (job summary),
@@ -84,6 +84,8 @@ jobs:
           TEST2_PIN: ${{ secrets.TEST2_PIN }}
           # WEB-05 / 09 / 13 register a new UAT user each run; the email and mobile OTP for new users is 111111 on UAT.
           TEST_NEW_USER_OTP: '111111'
+          # UAT test gift card (WEB-45; the test skips itself without it).
+          TEST_GIFT_CARD: ${{ secrets.TEST_GIFT_CARD }}
           # KNET test card used by the KNET tests (WEB-04, WEB-31, WEB-42).
           TEST_KNET_NUMBER: ${{ secrets.TEST_KNET_NUMBER }}
           TEST_KNET_EXPIRY: ${{ secrets.TEST_KNET_EXPIRY }}

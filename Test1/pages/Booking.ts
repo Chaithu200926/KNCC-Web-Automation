@@ -43,11 +43,14 @@ export const showTimes = (page: Page) => page.locator('.time-box:visible');
  */
 export async function chooseShow(page: Page, baseUrl: string, date: ShowDate = 'tomorrow', minHoursAhead = 3): Promise<Show> {
   await openHome(page, baseUrl); // Load the homepage.
+  const notLoaded: string[] = []; // Movie pages that did not load in time.
   for (const href of await bannerMovieLinks(page)) { // Try each banner movie until one has a suitable show.
-    const show = await chooseShowOfMovie(page, baseUrl, href, date, minHoursAhead); // This movie's show, if any.
+    // A movie page that does not load in time (seen on CI, 4 Oct 2026: no date tabs after 60 s) is skipped, not fatal.
+    const show = await chooseShowOfMovie(page, baseUrl, href, date, minHoursAhead)
+      .catch((error: Error) => { notLoaded.push(`${href} (${error.message.split(/\r?\n/)[0].slice(0, 80)})`); return undefined; });
     if (show) return show;
   }
-  throw new Error(`No homepage movie has a suitable ${date} show.`);
+  throw new Error(`No homepage movie has a suitable ${date} show.${notLoaded.length ? ` Pages that did not load: ${notLoaded.join('; ')}` : ''}`);
 }
 
 /** Which date to book: today, tomorrow, or the next Monday (half-price day) / Tuesday (normal price). */

@@ -24,11 +24,11 @@ records no trace.
 ### Website test cases (WEB-xx)
 
 The **Web** sheet of `KNCC-Test-Cases-All-Projects.xlsx` lists only automatable cases, numbered WEB-01..WEB-50 in
-order: the automated cases first (WEB-01..WEB-44), then the cases still planned (WEB-45..WEB-50). Each automated
+order: the automated cases first (WEB-01..WEB-45), then the cases still planned (WEB-46..WEB-50). Each automated
 case has its own spec file, `Test1/tests/web-NN-<test case name>.spec.ts`, whose test title is the case number and
 name from the sheet (e.g. "WEB-24 Seat category, seat type and ticket quantity"). All of them run in CI and on the QA PC, each in a new incognito browser context (no cookies or cache carried over from other tests,
-service workers blocked), so no cache clearing is needed. Cases still planned (no spec yet): WEB-45 credit
-card, WEB-46 gift card, WEB-47 bank offer, WEB-48 recharge the wallet, WEB-49 browsers and screen sizes, WEB-50 network
+service workers blocked), so no cache clearing is needed. Cases still planned (no spec yet): WEB-46 credit
+card, WEB-47 bank offer, WEB-48 recharge the wallet, WEB-49 browsers and screen sizes, WEB-50 network
 lost during booking. The specs share the test account, so run them one at a time:
 
 ```bash
@@ -43,7 +43,7 @@ npx playwright test tests/web-24-seat-category-type-quantity.spec.ts    # one te
 | Homepage and movies | WEB-14 homepage content, WEB-15 events & promotions, WEB-16 search, WEB-17 Arabic website, WEB-18 movie lists, WEB-19 filters, WEB-20 trailer, WEB-39 movie details, WEB-40 cinema map links |
 | Showtimes and prices | WEB-21 by location, WEB-22 today and future dates, WEB-23 half-price Monday |
 | Seats and food | WEB-24 seat category / type / quantity, WEB-25 seat map rules, WEB-26 food for today's show, WEB-27 no food for a future date, WEB-38 same seat chosen by two users |
-| Holds, payment and bookings | WEB-28 price check to history, WEB-29 seat free again after going back, WEB-44 abandoned seat released for other customers, WEB-30 cancel during booking, WEB-31 payment cancelled at the gateway, WEB-32 OTP during booking, WEB-33 ticket matches the choices, WEB-34 upcoming bookings, WEB-35 history, WEB-36 cancel and wallet refund, WEB-41 refresh does not book again, WEB-42 KNET refund to the wallet, WEB-43 pay with an empty wallet |
+| Holds, payment and bookings | WEB-28 price check to history, WEB-29 seat free again after going back, WEB-44 abandoned seat released for other customers, WEB-30 cancel during booking, WEB-31 payment cancelled at the gateway, WEB-32 OTP during booking, WEB-33 ticket matches the choices, WEB-34 upcoming bookings, WEB-35 history, WEB-36 cancel and wallet refund, WEB-41 refresh does not book again, WEB-42 KNET refund to the wallet, WEB-45 pay with a gift card, WEB-43 pay with an empty wallet |
 
 WEB-28, 33, 34, 36 and 41 pay with the test account's wallet and WEB-42 with the KNET test card; each cancels its
 booking afterwards. WEB-26 and WEB-28 need a show later the same day (food is offered for today's shows only), so
@@ -111,6 +111,7 @@ npm run portal                      # start the local team portal (see team-port
 | `TEST_KNET_NUMBER` | KNET booking test | KNET test card number |
 | `TEST_KNET_EXPIRY` | KNET booking test | Card expiry as `MM/YY` |
 | `TEST_KNET_PIN` | KNET booking test | Card PIN, exactly 4 digits (the KNET test card accepts any 4 digits) |
+| `TEST_GIFT_CARD` | WEB-45 | UAT test gift card number (the test skips itself without it) |
 | `TEST2_USERNAME` | WEB-31, 38, 43, 44 | Second test account email (an account with no wallet balance) |
 | `TEST2_PASSWORD` | WEB-31, 38, 43, 44 | Second test account password |
 | `TEST2_PIN` | WEB-31, 38, 43, 44 | Email OTP code for the second test account |
@@ -121,7 +122,7 @@ npm run portal                      # start the local team portal (see team-port
 ## Continuous integration: **CINESCAPE WEB Testing**
 
 The workflow [`cinescape-web-testing.yml`](.github/workflows/cinescape-web-testing.yml) runs every automated
-website test case (44 specs, about 40 minutes) one after another on a GitHub-hosted Ubuntu machine with Chromium.
+website test case (45 specs, about 40 minutes) one after another on a GitHub-hosted Ubuntu machine with Chromium.
 The dashboard shows each test with its steps, a screenshot after every step, the test video (and the second user's
 video for the two-user tests) and the notes the test recorded, such as booking IDs, amounts and refunds.
 

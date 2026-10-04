@@ -25,8 +25,12 @@ export const test = base.extend<{ testConfig: TestConfig; step: StepWithShot; se
       await base.step(title, async () => { // Show the step by name in the report.
         await body(); // Run the step's actions and checks.
         const file = testInfo.outputPath(`step-${String(++count).padStart(2, '0')}.png`); // e.g. step-03.png.
-        await page.screenshot({ path: file });
-        await testInfo.attach(title, { path: file, contentType: 'image/png' }); // Screenshot for the dashboard.
+        // A screenshot waits for the page's web fonts; on UAT they sometimes never finish loading (seen 4 Oct 2026, a
+        // step screenshot timed out after 60 s and failed the test). The screenshot is evidence, not a check: if it
+        // cannot be taken within 20 s, the report says so and the test carries on.
+        const taken = await page.screenshot({ path: file, timeout: 20_000 }).then(() => true, () => false);
+        if (taken) await testInfo.attach(title, { path: file, contentType: 'image/png' }); // Screenshot for the dashboard.
+        else testInfo.annotations.push({ type: 'screenshot skipped', description: `"${title}": the page did not finish loading its fonts within 20 s.` });
       });
     });
   },

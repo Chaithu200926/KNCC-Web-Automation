@@ -27,6 +27,8 @@ export interface TestConfig {
     knetNumber: string;
     knetExpiry: string;
     knetPin: string;
+    /** UAT test gift card number (WEB-45 gift card payment). */
+    giftCard: string;
   };
 }
 
@@ -52,5 +54,6 @@ export const testConfig: TestConfig = {
     knetNumber: process.env.TEST_KNET_NUMBER ?? '',
     knetExpiry: process.env.TEST_KNET_EXPIRY ?? '',
     knetPin: process.env.TEST_KNET_PIN ?? '',
+    giftCard: process.env.TEST_GIFT_CARD ?? '',
   },
 };
