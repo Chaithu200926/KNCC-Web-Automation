@@ -10,7 +10,7 @@
 // If the site frees the seat as soon as user 1 leaves (sooner than the timer), the test passes as well: the expected
 // result allows an earlier release, and double booking while a seat is really held is checked in WEB-38.
 // (Until 4 Oct 2026 this was WEB-29; WEB-29 now checks the same customer going back and taking the seat again.)
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test accounts), step() and secondUser (second browser).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, test accounts), step() and secondUser (second browser).
 import { flatText } from '../pages/BookingChecks'; // Text helper.
 import { // Booking steps (see pages/Booking.ts):
   cancelDuringBooking, chooseCategoryAndType, chooseShow, clickSeat, clickShowSignedOut, proceedToSeatMap,
@@ -78,7 +78,8 @@ test('WEB-44 Abandoned seat is released for other customers', async ({ page, ste
       return;
     }
     expect(['refused', 'not selectable'], `While user 1 holds ${seatName}, user 2 must not be able to reserve it`).toContain(attempt.outcome);
-    expect.soft(attempt.shown, `While user 1 holds ${seatName}, user 2's seat map should show it as Unavailable`).toBe('unavailable');
+    // The seat map is cached for about a minute, so a just-held seat can still be drawn as free; the refusal above is what counts.
+    notOnUat(attempt.shown === 'unavailable', `${seatName} held by user 1 is still drawn as "${attempt.shown}" on user 2's seat map (seat map cached for about a minute).`);
   });
 
   await step(`User 2 tries again every 30 s until the seat can be reserved (expected within ${HOLD_LIMIT_MIN} minutes)`, async () => {

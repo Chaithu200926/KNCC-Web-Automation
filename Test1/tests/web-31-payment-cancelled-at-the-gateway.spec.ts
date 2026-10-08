@@ -7,7 +7,7 @@ import { flatText, readWalletBalance } from '../pages/BookingChecks'; // Text an
 import { appears, openHome } from '../pages/WebSite'; // Opens the homepage; waits for a pop-up.
 import { signIn } from '../pages/Account'; // Sign-in from the header.
 import { // Booking steps (see pages/Booking.ts):
-  cancelDuringBooking, chooseCategoryAndType, chooseShow, clickShowSignedOut, openBookings, proceedToSeatMap,
+  bookingCard, cancelDuringBooking, chooseCategoryAndType, chooseShow, clickShowSignedOut, openBookings, proceedToSeatMap,
   proceedWithFreeSeats, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, startKnetPayment,
   tryToReserveSeat, upcomingBookingIds, type Show,
 } from '../pages/Booking';
@@ -64,8 +64,12 @@ test('WEB-31 Payment fails or is cancelled at the gateway', async ({ page, step,
 
   await step('Check My Account has no new booking and the same wallet balance', async () => {
     await openBookings(page); // My Account > BOOKINGS.
-    const newBookings = (await upcomingBookingIds(page)).filter((id) => !bookingsBefore.includes(id)); // Any new IDs?
-    expect(newBookings, 'No new booking should be listed').toEqual([]);
+    const newIds = (await upcomingBookingIds(page)).filter((id) => !bookingsBefore.includes(id)); // Any new IDs?
+    // Only a booking for this show counts: the shared test account can get other bookings meanwhile (seen 8 Oct 2026).
+    const newBookings: string[] = [];
+    for (const id of newIds) if (await bookingCard(page, id, show.title).count()) newBookings.push(id);
+    if (newIds.length > newBookings.length) testInfo.annotations.push({ type: 'other new bookings', description: `Listed, but not for ${show.movieTitle}: ${newIds.filter((id) => !newBookings.includes(id)).join(', ')}` });
+    expect(newBookings, `No new booking for ${show.movieTitle} should be listed`).toEqual([]);
     expect(fils(await readWalletBalance(page)), 'The wallet balance should not change').toBe(fils(walletBefore));
   });
 

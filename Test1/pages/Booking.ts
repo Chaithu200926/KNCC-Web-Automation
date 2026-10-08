@@ -498,8 +498,20 @@ export async function openBookings(page: Page) {
 
 /** Booking IDs of the visible booking cards in My Account > Bookings (UPCOMING BOOKINGS), e.g. ["WRK7RP2"]. */
 export async function upcomingBookingIds(page: Page) {
-  const text = flatText((await page.locator('body').innerText())); // Page text (hidden mobile copies are not included).
-  return [...new Set([...text.matchAll(/booking id\s*:?\s*([A-Z0-9]{5,})/gi)].map((match) => match[1]))]; // Each ID once.
+  const read = async () => {
+    const text = flatText((await page.locator('body').innerText())); // Page text (hidden mobile copies are not included).
+    return [...new Set([...text.matchAll(/booking id\s*:?\s*([A-Z0-9]{5,})/gi)].map((match) => match[1]))]; // Each ID once.
+  };
+  // The cards load a moment after "UPCOMING BOOKINGS" (seen on UAT, 8 Oct 2026: a first read missed 2 bookings), so read
+  // again every 2 s until two reads agree (up to 5 times).
+  let ids = await read();
+  for (let tries = 0; tries < 5; tries++) {
+    await page.waitForTimeout(2_000);
+    const again = await read();
+    if (again.join() === ids.join()) break;
+    ids = again;
+  }
+  return ids;
 }
 
 /** Cancels a confirmed booking from its card in My Account > Bookings (Cancel Booking, then "Yes, I'm sure"). */

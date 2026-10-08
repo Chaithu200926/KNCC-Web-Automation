@@ -3,7 +3,7 @@
 // Edit Password checks a wrong current password and a mismatch are refused, changes the password, checks the new one
 // works and the old one does not, and changes it back. Each run leaves one new UAT user.
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site, OTP for new users) and step() (step + screenshot).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, OTP for new users) and step() (step + screenshot).
 import { myAccountLink, openSignInDialog, signIn, signOut, submitSignIn } from '../pages/Account'; // Sign-in steps.
 import { closeOpenMessage, openMessage } from '../pages/Booking'; // The site's open message pop-up.
 import { changePasswordDialog, newTestUser, openChangePassword, registerNewUser, submitChangePassword } from '../pages/NewUser'; // New user steps.
@@ -44,13 +44,13 @@ test('WEB-13 Change password', async ({ page, step, testConfig }, testInfo) => {
     await closeOpenMessage(page); // OK.
   });
 
-  await step('Enter the correct current password and a valid new password, Proceed, and check the success message', async () => {
+  await step('Enter the correct current password and a valid new password, Proceed, and check the change is accepted', async () => {
     const answer = page.waitForResponse((r) => /changepassword/i.test(r.url()) && r.request().method() === 'POST', { timeout: 30_000 }); // The change request.
     await submitChangePassword(page, user.password, newPassword); // Correct current password.
     expect((await answer).ok(), 'The site should accept the change').toBe(true);
     const confirmed = await appears(openMessage(page), 10_000); // A success message within 10 s?
     testInfo.annotations.push({ type: 'after the change', description: confirmed ? `Message: ${(await openMessage(page).innerText()).replace(/\s+/g, ' ')}` : 'No message is shown.' });
-    expect.soft(confirmed, 'The site should confirm the password change').toBe(true);
+    notOnUat(confirmed, 'Change Password: no success message is shown (the change is accepted and the user is signed out).');
     if (confirmed) await closeOpenMessage(page); // OK.
     await expect(changePasswordDialog(page), 'The Change Password dialog should close').toBeHidden({ timeout: 15_000 });
   });

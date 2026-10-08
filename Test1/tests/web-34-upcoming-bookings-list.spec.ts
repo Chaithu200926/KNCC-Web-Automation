@@ -39,7 +39,12 @@ test('WEB-34 Upcoming bookings list', async ({ page, step, testConfig }, testInf
   });
 
   await step('Check every upcoming booking is for a show that has not started yet', async () => {
-    const text = flatText(await page.locator('body').innerText()); // Bookings list text.
+    const fullText = flatText(await page.locator('body').innerText()); // Bookings list text.
+    // "FOOD ORDER" cards (food without a ticket, listed since the 8 Oct 2026 deployment) show when the food was ordered,
+    // not a show time, so they are left out: "FOOD ORDER DATE & TIME 08 Oct 2026 | 09:14 Food Pickup ID WPTDLBF View Details".
+    const foodOrders = [...fullText.matchAll(/FOOD ORDER.*?View Details/gi)].map((match) => match[0]);
+    if (foodOrders.length) testInfo.annotations.push({ type: 'food orders listed', description: foodOrders.join('; ') });
+    const text = foodOrders.reduce((rest, order) => rest.replace(order, ' '), fullText); // Movie bookings only.
     const shows = [...text.matchAll(/\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s*\|\s*\d{1,2}:\d{2})\b/g)].map((match) => match[1]); // "01 Oct 2026 | 20:35".
     testInfo.annotations.push({ type: 'upcoming shows', description: [...new Set(shows)].join('; ') });
     for (const dateTime of new Set(shows)) {

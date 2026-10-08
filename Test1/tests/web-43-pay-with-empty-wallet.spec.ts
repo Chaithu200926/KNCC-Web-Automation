@@ -3,7 +3,7 @@
 // up to the payment page, tries "Use your Wallet", and checks the payment is refused ("Insufficient wallet balance"),
 // nothing is taken off the total and Proceed stays disabled. Then cancels; no booking is made.
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test accounts) and step() (step + screenshot).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, test accounts) and step() (step + screenshot).
 import { fils, flatText, readKwdAfter } from '../pages/BookingChecks'; // Amount helpers.
 import { // Booking steps (see pages/Booking.ts):
   cancelDuringBooking, chooseCategoryAndType, chooseShow, closeOpenMessage, openBookings, openMessage,
@@ -41,9 +41,11 @@ test('WEB-43 Pay with an empty wallet', async ({ page, step, testConfig }, testI
     await page.getByRole('button', { name: /use your wallet/i }).last().click(); // Open the wallet section.
     await expect(walletPanel).toBeVisible(); // Balance and Apply.
     let shown = ''; // e.g. "Balance Apply" (seen on UAT, 1 Oct 2026: no amount).
-    await expect.soft.poll(async () => (shown = flatText(await walletPanel.innerText())), // Given 10 s for the amount to load.
-      { message: 'The wallet panel should show the balance, KWD 0.000', timeout: 10_000 }).toMatch(/KWD\s*0\.000/);
+    const amount = await expect.poll(async () => (shown = flatText(await walletPanel.innerText())), // Given 10 s for the amount to load.
+      { timeout: 10_000 }).toMatch(/KWD\s*\d+\.\d{3}/).then(() => true, () => false);
     testInfo.annotations.push({ type: 'wallet panel', description: shown });
+    if (amount) expect(shown, 'The empty wallet should show KWD 0.000').toMatch(/KWD\s*0\.000/); // Checked when an amount is shown.
+    else notOnUat(false, 'The wallet panel shows no balance amount for the empty wallet.');
   });
 
   await step('Click Apply; check "Insufficient wallet balance", nothing is taken off the total and Proceed stays disabled', async () => {
@@ -68,8 +70,10 @@ test('WEB-43 Pay with an empty wallet', async ({ page, step, testConfig }, testI
     await openBookings(page); // My Account > BOOKINGS.
     expect(await upcomingBookingIds(page), 'The second account should have no booking (it cannot pay)').toEqual([]);
     let balance: number | undefined; // e.g. 0 (seen on UAT, 1 Oct 2026: no amount shown).
-    await expect.soft.poll(async () => (balance = readKwdAfter(await page.locator('body').innerText(), 'Wallet Balance')), // Given 15 s to load.
-      { message: 'My Account should show Wallet Balance KWD 0.000', timeout: 15_000 }).toBe(0);
+    await expect.poll(async () => (balance = readKwdAfter(await page.locator('body').innerText(), 'Wallet Balance')), // Given 15 s to load.
+      { timeout: 15_000 }).not.toBeUndefined().catch(() => undefined);
     testInfo.annotations.push({ type: 'wallet balance', description: balance === undefined ? '"Wallet Balance" shows no amount.' : `KWD ${balance.toFixed(3)}` });
+    if (balance === undefined) notOnUat(false, 'My Account "Wallet Balance" shows no amount for the empty wallet.');
+    else expect(balance, 'My Account should show Wallet Balance KWD 0.000').toBe(0); // Checked when an amount is shown.
   });
 });

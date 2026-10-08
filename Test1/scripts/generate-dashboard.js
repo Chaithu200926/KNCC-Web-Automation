@@ -332,7 +332,7 @@ const testCards = tests
   .map((t, i) => {
     const k = kind(t.status);
     const failedSteps = t.steps.filter((s) => s.failed).length;
-    return `<article class="test ${k}" id="test-${i + 1}">
+    return `<article class="test ${k}" id="test-${i + 1}" data-kind="${k}" data-text="${esc(t.title.toLowerCase())}">
   <header>
     <span class="pill ${k}">${icon[k]} ${label(t.status)}</span>
     <h3>${esc(t.title)}</h3>
@@ -353,7 +353,7 @@ const testCards = tests
 const overview = tests
   .map((t, i) => {
     const k = kind(t.status);
-    return `<tr><td><a href="#test-${i + 1}">${esc(t.title)}</a></td><td><span class="pill ${k}">${icon[k]} ${label(t.status)}</span></td>
+    return `<tr data-kind="${k}" data-text="${esc(t.title.toLowerCase())}"><td><a href="#test-${i + 1}">${esc(t.title)}</a></td><td><span class="pill ${k}">${icon[k]} ${label(t.status)}</span></td>
       <td>${secs(t.duration)}</td><td>${t.steps.length}</td><td>${esc(t.error.split('\n')[0])}</td><td>${historyChips(t.id)}</td></tr>`;
   })
   .join('');
@@ -398,6 +398,14 @@ a { color:var(--accent); } .muted { color:var(--muted); font-size:13px; }
 .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
 .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:20px 0; }
 .tile { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+button.tile { font:inherit; color:inherit; text-align:left; cursor:pointer; } button.tile:hover, button.tile:focus-visible { border-color:var(--accent); }
+.filters { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; padding:10px 12px; }
+.fbtn { font:inherit; font-size:13px; padding:4px 12px; border-radius:20px; border:1px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer; }
+.fbtn b { font-variant-numeric:tabular-nums; } .fbtn[aria-pressed="true"] { border-color:var(--accent); background:var(--accent); color:var(--panel); }
+.fbtn.fail[aria-pressed="true"] { background:var(--critical); border-color:var(--critical); color:#fff; } .fbtn.pass[aria-pressed="true"] { background:var(--good); border-color:var(--good); color:#fff; }
+.fbtn.skip[aria-pressed="true"] { background:var(--warning); border-color:var(--warning); color:#1b2230; }
+#filter-text { font:inherit; font-size:13px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); min-width:220px; flex:1; max-width:340px; }
+[hidden] { display:none !important; }
 .tile b { display:block; font-size:28px; font-variant-numeric:tabular-nums; } .tile span { color:var(--muted); font-size:13px; }
 .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .kv { width:100%; border-collapse:collapse; font-size:13px; } .kv th { text-align:left; color:var(--muted); font-weight:500; padding:4px 12px 4px 0; width:38%; vertical-align:top; }
@@ -446,9 +454,9 @@ footer { color:var(--muted); font-size:13px; margin-top:24px; }
 
 <section class="tiles">
   <div class="tile"><b>${total}</b><span>Tests</span></div>
-  <div class="tile"><b>${passed}</b><span>✓ Passed</span></div>
-  <div class="tile"><b>${failed}</b><span>✗ Failed</span></div>
-  <div class="tile"><b>${skipped}</b><span>– Skipped</span></div>
+  <button type="button" class="tile" data-filter="pass" title="Show only the passed tests"><b>${passed}</b><span>✓ Passed</span></button>
+  <button type="button" class="tile" data-filter="fail" title="Show only the failed tests"><b>${failed}</b><span>✗ Failed</span></button>
+  <button type="button" class="tile" data-filter="skip" title="Show only the skipped tests"><b>${skipped}</b><span>– Skipped</span></button>
   <div class="tile"><b>${passRate}%</b><span>Pass rate</span></div>
   <div class="tile"><b>${stepCount}</b><span>Steps executed</span></div>
   <div class="tile"><b>${secs(run.wallMs)}</b><span>Duration</span></div>
@@ -462,14 +470,64 @@ footer { color:var(--muted); font-size:13px; margin-top:24px; }
 </section>
 
 <h2>Overview</h2>
-<div class="panel scroll"><table class="list"><thead><tr><th>Test</th><th>Result</th><th>Duration</th><th>Steps</th><th>Failure</th><th>Last 10 runs</th></tr></thead><tbody>${overview || '<tr><td colspan="6">No tests found</td></tr>'}</tbody></table></div>
+<div class="filters panel" role="toolbar" aria-label="Filter the tests">
+  <span class="muted">Show</span>
+  <button type="button" class="fbtn" data-filter="all" aria-pressed="true">All <b>${total}</b></button>
+  <button type="button" class="fbtn fail" data-filter="fail" aria-pressed="false">✗ Failed <b>${failed}</b></button>
+  <button type="button" class="fbtn pass" data-filter="pass" aria-pressed="false">✓ Passed <b>${passed}</b></button>
+  <button type="button" class="fbtn skip" data-filter="skip" aria-pressed="false">– Skipped <b>${skipped}</b></button>
+  <input type="search" id="filter-text" placeholder="Search a test, e.g. WEB-29 or gift" aria-label="Search the tests by number or name">
+  <span class="muted" id="filter-count" aria-live="polite"></span>
+</div>
+<div class="panel scroll"><table class="list"><thead><tr><th>Test</th><th>Result</th><th>Duration</th><th>Steps</th><th>Failure</th><th>Last 10 runs</th></tr></thead><tbody>${overview || '<tr><td colspan="6">No tests found</td></tr>'}<tr id="no-match-row" hidden><td colspan="6" class="muted">No test matches this filter.</td></tr></tbody></table></div>
 
 <h2>Test details</h2>
 ${testCards || '<p>No tests found.</p>'}
+<p id="no-match-cards" class="muted" hidden>No test matches this filter.</p>
 <footer>Generated from Playwright JSON results. Screenshots and test videos are bundled with the dashboard.</footer>
 </main>
 <div class="tip" id="tip"></div>
 <script>
+// Filter: All / Failed / Passed / Skipped and a search box; applies to the overview table and the test cards.
+// The choice is kept in the address (#filter=fail&q=web-29), so a "failed only" link can be bookmarked or shared.
+(function () {
+  var state = { filter: 'all', q: '' };
+  var items = document.querySelectorAll('tr[data-kind], article[data-kind]');
+  var box = document.getElementById('filter-text');
+  function apply(keepAddress) {
+    var shown = 0, rows = 0, cards = 0, total = document.querySelectorAll('article[data-kind]').length;
+    items.forEach(function (el) {
+      var kind = el.getAttribute('data-kind');
+      var ok = (state.filter === 'all' || kind === state.filter)
+        && (!state.q || el.getAttribute('data-text').indexOf(state.q) !== -1);
+      el.hidden = !ok;
+      if (ok && el.tagName === 'ARTICLE') cards += 1; else if (ok) rows += 1;
+    });
+    shown = cards;
+    document.getElementById('no-match-row').hidden = rows > 0;
+    document.getElementById('no-match-cards').hidden = cards > 0;
+    document.getElementById('filter-count').textContent = 'Showing ' + shown + ' of ' + total;
+    document.querySelectorAll('.fbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-filter') === state.filter)); });
+    if (keepAddress) return; // Opened from a link such as #test-37, or with no filter: leave the address as it is.
+    var hash = (state.filter !== 'all' ? 'filter=' + state.filter : '') + (state.q ? (state.filter !== 'all' ? '&' : '') + 'q=' + encodeURIComponent(state.q) : '');
+    history.replaceState(null, '', hash ? '#' + hash : location.pathname + location.search);
+  }
+  function read() {
+    var h = new URLSearchParams(location.hash.slice(1));
+    state.filter = ['fail', 'pass', 'skip'].indexOf(h.get('filter')) !== -1 ? h.get('filter') : 'all';
+    state.q = (h.get('q') || '').toLowerCase();
+    box.value = state.q;
+  }
+  document.querySelectorAll('[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.filter = b.getAttribute('data-filter'); apply();
+      if (b.classList.contains('tile')) document.querySelector('.filters').scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+  box.addEventListener('input', function () { state.q = box.value.trim().toLowerCase(); apply(); });
+  if (/^#test-\\d+$/.test(location.hash)) { apply(true); return; } // A link to one test: show everything, keep the link.
+  read(); apply(!location.hash);
+})();
 // Tooltip for the trend chart columns (mouse hover and keyboard focus).
 (function () {
   var tip = document.getElementById('tip');

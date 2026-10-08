@@ -1,6 +1,6 @@
 // WEB-40 Cinema location map links - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // No sign-in; the test only reads the site. "Soft" checks (expect.soft) report a problem but let the test carry on.
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site address) and step() (step + screenshot).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site address) and step() (step + screenshot).
 import { openHome } from '../pages/WebSite'; // Opens the homepage and waits for the movie list.
 
 test.describe.configure({ timeout: 180_000 }); // The test may take up to 3 minutes (the UAT site can be slow).
@@ -10,19 +10,23 @@ const mapsCoordinates = (url: string) => decodeURIComponent(url).match(/google\.
 
 test('WEB-40 Cinema location map links', async ({ page, step, testConfig }, testInfo) => {
   let popupPlace: string | undefined; // Coordinates shown by the Locations page map.
+  // The Cinescape 360 card. Since the 8 Oct 2026 deployment the Locations page also lists Cinescape Ajial and Avenues,
+  // in a changing order (Ajial has no data on UAT yet), so the card is found by its name, not by position.
+  const card = page.locator('.cinescap_location').filter({ has: page.locator('h3').filter({ hasText: /^\s*cinescape 360\s*$/i }) }).first();
 
   await step('Open the footer LOCATIONS link and check the cinema is listed', async () => {
     await openHome(page, testConfig.urls.home); // Load the homepage.
     await page.locator('footer:not(.footer-mobile):visible a').filter({ hasText: /^locations$/i }).first().click(); // Footer LOCATIONS.
     await expect(page).toHaveURL(/\/locations$/); // Locations page.
     await expect(page.getByText(/^cinescape 360$/i).first()).toBeVisible({ timeout: 60_000 }); // Cinescape 360 is listed.
-    const address = async () => (await page.locator('.location_info').first().innerText()).replace(/\b(?:location|maps)\b/gi, '').trim(); // Text under LOCATION.
-    await expect.soft.poll(address, { message: 'The Locations page should show the cinema address under LOCATION', timeout: 20_000 })
-      .not.toBe(''); // Given 20 s to load (seen empty on 30 Sep and 1 Oct 2026).
+    const address = async () => (await card.locator('.location_info').first().innerText()).replace(/\b(?:location|maps)\b/gi, '').trim(); // Text under LOCATION.
+    // The Locations list shows no address under LOCATION on UAT (30 Sep - 8 Oct 2026); the cinema page has it (checked below).
+    notOnUat(await expect.poll(address, { timeout: 20_000 }).not.toBe('').then(() => true, () => false), // Given 20 s to load.
+      'The Locations page shows no cinema address under LOCATION.');
   });
 
   await step('Click Maps and check a pop-up shows a Google map of the cinema, then close it', async () => {
-    await page.locator('p.map').filter({ hasText: /maps/i }).first().click(); // "Maps" under Cinescape 360.
+    await card.locator('p.map').filter({ hasText: /maps/i }).first().click(); // "Maps" under Cinescape 360.
     const popup = page.locator('[role="dialog"]:visible').last(); // The map pop-up.
     const map = popup.locator('iframe'); // Google map inside it.
     await expect(map).toBeVisible({ timeout: 15_000 });
@@ -33,9 +37,12 @@ test('WEB-40 Cinema location map links', async ({ page, step, testConfig }, test
   });
 
   await step('Open the Cinescape 360 cinema page and check its address and Maps link', async () => {
-    await page.locator('a[href*="/cinemasessions/"]').first().click(); // Cinema picture = link to the cinema page.
-    await expect(page).toHaveURL(/\/cinemasessions\//);
+    const cinemaLink = card.locator('a[href*="/cinemasessions/"]').first(); // Cinema picture = link to the cinema page.
+    // Its caption (.house_text) can cover the picture and take the click (seen on UAT, 8 Oct 2026): then the click event is
+    // sent to the link itself. (Opening the address directly is no good: the cinema page then has no coordinates.)
     const mapsLink = page.locator('a[href*="google."][href*="/maps"]').first(); // "Maps" link.
+    await cinemaLink.click({ timeout: 15_000 }).catch(() => cinemaLink.dispatchEvent('click'));
+    await expect(page).toHaveURL(/\/cinemasessions\/0*1$/); // Cinescape 360's page.
     // The link first reads "q=undefined,undefined" and gets the coordinates once the cinema data loads.
     await expect(mapsLink).toHaveAttribute('href', /[?&]q=-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?/, { timeout: 30_000 });
     await expect(mapsLink).toHaveAttribute('target', '_blank'); // Opens in a new tab.

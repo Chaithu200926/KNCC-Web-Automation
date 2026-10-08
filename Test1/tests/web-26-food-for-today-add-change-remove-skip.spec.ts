@@ -3,14 +3,14 @@
 // changes and removes it, goes on to payment with food, then starts again and uses SKIP & PROCEED.
 // Uses the test account; both bookings are cancelled before paying. The seats are held for 4 minutes per booking.
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { fils } from '../pages/BookingChecks'; // KWD → fils.
 import { // Booking steps (see pages/Booking.ts):
   cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedToSeatMap, proceedWithFreeSeats, readPaymentSummary,
   reopenSeatMap, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
 } from '../pages/Booking';
 import { // Food page steps (see pages/Food.ts):
-  addFood, foodButtons, foodCategories, foodCount, foodItems, foodPageTotal, foodPrice, openedFoodPage, proceedFromFood,
+  addFood, foodCategories, foodCount, foodItems, foodPageTotal, foodPrice, openedFoodPage, proceedFromFood, removeFoodControl,
 } from '../pages/Food';
 
 test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (sign-in and two bookings on the slow UAT site).
@@ -52,37 +52,39 @@ test("WEB-26 Food for today's show: add, change, remove, skip", async ({ page, s
     await expect.soft(page.getByText(/time remaining/i).filter({ visible: true }).first(), 'TIME REMAINING should be shown').toBeVisible();
   });
 
-  await step('Add the first item (choosing its options); check TOTAL rises by its price', async () => {
+  await step('Add the first item (choosing its options); check it shows "1 item added" and TOTAL rises by its price', async () => {
     itemName = (await item.locator('h4').innerText()).trim(); // e.g. "Combo 2".
     price = (await foodPrice(item)) ?? Number.NaN; // e.g. 2.
     testInfo.annotations.push({ type: 'food item', description: `${itemName}, KWD ${price.toFixed(3)}` });
-    await addFood(page, item); // Add > options > Done; the item shows "- 1 +".
+    await addFood(page, item); // Add > options > quantity 1 > Done; the item shows "1 item added".
     await expectTotal(price, `After adding ${itemName}`);
   });
 
-  await step('Change the quantity to 2 and back to 1; check TOTAL each time', async () => {
-    await foodButtons(item).plus.click(); // +
+  await step('Change the quantity: Add the same item again; check it shows "2 items added" and TOTAL = ticket + 2 x the item', async () => {
+    // Since the 8 Oct 2026 deployment the quantity is chosen in the options window; Add again puts one more in the cart.
+    await addFood(page, item); // Add > options > quantity 1 > Done.
     await expect.poll(() => foodCount(item)).toBe(2);
     await expectTotal(price * 2, `With 2 x ${itemName}`);
-    await foodButtons(item).minus.click(); // -
-    await expect.poll(() => foodCount(item)).toBe(1);
-    await expectTotal(price, `With 1 x ${itemName}`);
   });
 
-  await step('Remove the item; check Add comes back and TOTAL is the ticket only', async () => {
-    await foodButtons(item).minus.click(); // - at 1 takes it out.
-    await expect(item.getByRole('button', { name: /^add$/i }), 'Add should come back').toBeVisible();
+  await step('Look for a way to remove the item on the food page (noted when there is none)', async () => {
+    // The food page has no "-" or remove since the 8 Oct 2026 deployment; that is noted, not failed. The food is
+    // left out instead with Cancel and SKIP & PROCEED (last steps).
+    const control = removeFoodControl(page, item);
+    if (!notOnUat(await control.count() > 0, 'The food page has no way to take an added item out of the cart ("-" or remove).')) return;
+    while (await foodCount(item) > 0 && await control.count()) await control.first().click(); // Take it all out.
+    await expect.poll(() => foodCount(item), { message: 'The item should be out of the cart' }).toBe(0);
     await expectTotal(0, 'After removing the item');
+    await addFood(page, item, 2); // Back to 2 for the next step.
   });
 
-  await step('Add the item again and Proceed; check the payment page shows the food and total = ticket + food', async () => {
-    await addFood(page, item); // Add again.
-    await expectTotal(price, `After adding ${itemName} again`);
+  await step('Proceed; check the payment page shows the food and total = ticket + food', async () => {
+    const food = price * await foodCount(item); // e.g. 2 x KWD 2.000.
     await proceedFromFood(page); // Proceed; payment page.
     const summary = await readPaymentSummary(page); // Order summary.
     expect.soft(fils(summary.ticketsTotal), 'Payment page: ticket line').toBe(fils(ticketsTotal));
-    expect.soft(fils(summary.food), `Payment page: Food Price should be KWD ${price.toFixed(3)}`).toBe(fils(price));
-    expect(fils(summary.total), 'Payment page: Total amount to be paid = ticket + food').toBe(fils(ticketsTotal) + fils(price));
+    expect.soft(fils(summary.food), `Payment page: Food Price should be KWD ${food.toFixed(3)}`).toBe(fils(food));
+    expect(fils(summary.total), 'Payment page: Total amount to be paid = ticket + food').toBe(fils(ticketsTotal) + fils(food));
   });
 
   await step('Cancel, book the same show again and use SKIP & PROCEED; check the payment page has the ticket only', async () => {

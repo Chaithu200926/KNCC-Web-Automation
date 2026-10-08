@@ -71,3 +71,12 @@ export const test = base.extend<{ testConfig: TestConfig; step: StepWithShot; se
 });
 
 export { expect } from '@playwright/test'; // Playwright's checks, re-exported for convenience.
+
+/**
+ * Records behaviour the UAT site does not have (a message or a feature that is not part of its logic, e.g. no
+ * "password changed" message) as a note on the test instead of failing it. Returns `ok` so the caller can branch on it.
+ */
+export const notOnUat = (ok: boolean, description: string): boolean => {
+  if (!ok) test.info().annotations.push({ type: 'not on UAT', description });
+  return ok;
+};

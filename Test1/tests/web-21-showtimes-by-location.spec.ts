@@ -14,7 +14,9 @@ test('WEB-21 Showtimes by location', async ({ page, step, testConfig }) => {
   let todayShows = 0; // Number of showtimes today at the cinema.
   await step('Open CINESCAPE LOCATIONS > Cinescape 360 from the homepage', async () => {
     await openHome(page, testConfig.urls.home); // Load the homepage.
-    await page.locator('section.location-section a[href*="/cinemasessions/"]').first() // The Cinescape 360 link
+    // Found by its name: since the 8 Oct 2026 deployment Cinescape Ajial and Avenues are listed too, in a changing order.
+    await page.locator('section.location-section .location-preview').filter({ hasText: /cinescape 360/i }).first()
+      .locator('a[href*="/cinemasessions/"]').first() // The Cinescape 360 link
       .evaluate((link) => (link as HTMLAnchorElement).click()); // clicked directly.
     await page.waitForURL(/\/cinemasessions\//, { timeout: 60_000 }); // The cinema page opens.
     await expect(page.getByText(/^cinescape 360$/i).first()).toBeVisible({ timeout: 60_000 }); // Its name is shown.

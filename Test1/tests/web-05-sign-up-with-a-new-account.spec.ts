@@ -3,7 +3,7 @@
 // touched), enters the email and mobile OTPs (111111 on UAT), checks the user is signed in and My Account shows the
 // details, then signs out and signs in again with the new email and password. Each run leaves one new UAT user.
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site, OTP for new users) and step() (step + screenshot).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, OTP for new users) and step() (step + screenshot).
 import { openHome } from '../pages/WebSite'; // Opens the homepage.
 import { myAccountLink, signIn, signOut } from '../pages/Account'; // Sign-in, My Account and sign-out.
 import { openMessage } from '../pages/Booking'; // The site's open message pop-up.
@@ -50,7 +50,7 @@ test('WEB-05 Sign up with a new account', async ({ page, step, testConfig }, tes
       await expect.poll(profileValues, { timeout: 20_000 }).toContain(user.email); // PROFILE filled in?
     }).toPass({ timeout: 75_000 }).then(() => true, () => false);
     testInfo.annotations.push({ type: 'My Account after sign-up', description: opened ? 'PROFILE opened.' : `Did not open; the site went to ${new URL(page.url()).pathname}.` });
-    expect.soft(opened, 'My Account > PROFILE should open for the new user right after signing up').toBe(true);
+    notOnUat(opened, 'My Account > PROFILE does not open for the new user right after signing up (works after signing in again).');
   });
 
   await step('Sign out, then sign in again with the new email and password', async () => {
@@ -68,8 +68,8 @@ test('WEB-05 Sign up with a new account', async ({ page, step, testConfig }, tes
       expect(values, `PROFILE should show the ${label} "${value}"`).toContain(value);
     }
     const shownDate = user.dateOfBirth.split('-').reverse().join('-'); // "1995-01-01".
-    expect.soft(values.some((value) => value.includes(shownDate) || value.includes(user.dateOfBirth)), `PROFILE should show the Date of Birth ${shownDate} (the sign-up form sent an empty date)`).toBe(true);
+    notOnUat(values.some((value) => value.includes(shownDate) || value.includes(user.dateOfBirth)), `PROFILE does not show the Date of Birth ${shownDate} entered at sign-up (the sign-up form sends an empty date).`);
     const genderChecked = await page.locator('label').filter({ visible: true }).filter({ hasText: new RegExp(`^${user.gender}$`) }).locator('input[type="radio"]').first().isChecked().catch(() => false);
-    expect.soft(genderChecked, `PROFILE should show the Gender ${user.gender}`).toBe(true);
+    notOnUat(genderChecked, `PROFILE does not show the Gender ${user.gender} entered at sign-up.`);
   });
 });

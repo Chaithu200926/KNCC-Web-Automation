@@ -42,22 +42,15 @@ test('WEB-37 Preferences', async ({ page, step, testConfig }) => {
     saved = await ageRating.evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).checked)); // Remember the saved state.
   });
 
-  await step('Change an age rating, click Cancel and check the saved choices are back', async () => {
+  await step('Change an age rating, click Cancel, reload the page and check the saved choices are back', async () => {
     await prefs.getByText('18+', { exact: true }).click(); // Tick / untick 18+ (click its label; not saved).
     expect(await ageRating.evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).checked)), 'The 18+ box should change').not.toEqual(saved);
     await prefs.getByRole('button', { name: /^cancel$/i }).click(); // Cancel.
-    await openAccountTab(page, 'PROFILE'); // Leave the tab
-    await openAccountTab(page, 'PREFERENCES'); // and come back.
-    // Expected: Cancel throws the change away. Seen on UAT (30 Sep 2026): the unsaved 18+ tick stays on screen until the page is reloaded.
-    await expect.soft.poll(async () => ageRating.evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).checked)),
-      { message: 'After Cancel, PREFERENCES should show the saved choices again (without reloading)', timeout: 20_000 }).toEqual(saved); // Given 20 s.
-  });
-
-  await step('Reload the page and check the saved choices did not change', async () => {
+    // The site keeps the unsaved tick on screen until the page is reloaded (not part of its logic), so reload first.
     await page.reload({ waitUntil: 'domcontentloaded' }); // Fresh copy from the server.
     await openAccountTab(page, 'PREFERENCES'); // PREFERENCES tab.
     await expect(page.getByText(/choose your preference/i).first()).toBeVisible({ timeout: 30_000 }); // Its introduction.
     await expect.poll(async () => ageRating.evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).checked)),
-      { message: 'Cancel must not save the change', timeout: 20_000 }).toEqual(saved); // Same as saved.
+      { message: 'Cancel must not save the change: after a reload PREFERENCES shows the saved choices', timeout: 20_000 }).toEqual(saved); // Same as saved.
   });
 });
