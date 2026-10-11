@@ -1,0 +1,158 @@
+# Web UI Automation test: started by hand from the Actions tab, runs every automated website test case (WEB-01..WEB-45, one spec file per case in
+# Test1/tests/web-NN-*.spec.ts) against the Cinescape UAT website, one test at a time, each in a new incognito
+# browser context, and publishes the results:
+#   * a results table on the run page (job summary),
+#   * a "Test results" check (JUnit),
+#   * the visual dashboard (trend, run info, steps, screenshots, videos) on GitHub Pages,
+#   * the dashboard, Playwright HTML report and raw results as a downloadable artifact
+#     (the Playwright report and traces are kept out of the public Pages site).
+name: Web UI Automation test
+
+on:
+  # Started by hand from the Actions tab only ("CINESCAPE WEB Testing" already runs on every push to main).
+  workflow_dispatch:
+
+# Read the code, publish the JUnit check, deploy to GitHub Pages.
+permissions:
+  contents: read
+  checks: write
+  pages: write
+  id-token: write
+
+# The tests book with the same accounts on the same UAT site,
+# so runs wait for each other instead of running in parallel.
+concurrency:
+  group: cinescape-uat-tests
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Run the web tests
+    # A full run takes about 40 minutes (WEB-44 alone waits up to about 9 minutes for a seat hold).
+    timeout-minutes: 100
+    runs-on: ubuntu-latest
+    # All commands run inside the Playwright project folder.
+    defaults:
+      run:
+        working-directory: Test1
+    steps:
+      # Get the code.
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # Install Node.js and reuse the npm download cache between runs.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Test1/package-lock.json
+
+      # Install the exact package versions from package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Download Chromium and the Linux libraries it needs.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Bring back the run history (for the trend chart) saved by the previous run.
+      - name: Restore run history
+        uses: actions/cache/restore@v4
+        with:
+          path: Test1/.history
+          key: cinescape-web-history-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: cinescape-web-history-
+
+      # Run all test cases one after another (workers = 1 on CI). A failure does not stop the job here,
+      # so the reports below are still built; the last step marks the run red instead.
+      - name: Run the Playwright tests
+        id: tests
+        continue-on-error: true
+        env:
+          # Main test account (sign-in and booking tests).
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          TEST_PIN: ${{ secrets.TEST_PIN }}
+          # Second test account (no wallet balance): the second user in WEB-31 / 38 / 44, the empty wallet in WEB-43.
+          TEST2_USERNAME: ${{ secrets.TEST2_USERNAME }}
+          TEST2_PASSWORD: ${{ secrets.TEST2_PASSWORD }}
+          TEST2_PIN: ${{ secrets.TEST2_PIN }}
+          # WEB-05 / 09 / 13 register a new UAT user each run; the email and mobile OTP for new users is 111111 on UAT.
+          TEST_NEW_USER_OTP: '111111'
+          # UAT test gift card (WEB-45; the test skips itself without it).
+          TEST_GIFT_CARD: ${{ secrets.TEST_GIFT_CARD }}
+          # KNET test card used by the KNET tests (WEB-04, WEB-31, WEB-42).
+          TEST_KNET_NUMBER: ${{ secrets.TEST_KNET_NUMBER }}
+          TEST_KNET_EXPIRY: ${{ secrets.TEST_KNET_EXPIRY }}
+          TEST_KNET_PIN: ${{ secrets.TEST_KNET_PIN }}
+        run: npx playwright test --retries=0
+
+      # Build the dashboard (with screenshots and videos) and put the results table on this run page.
+      # The Playwright HTML report is NOT copied into the public dashboard: its traces record
+      # typed values (password, OTP, card details). It stays in the artifact below only.
+      - name: Build dashboard and run summary
+        if: always()
+        env:
+          HISTORY_FILE: .history/history.json
+        run: |
+          rm -rf dashboard/playwright-report
+          npm run dashboard
+
+      # Save the updated run history for the next run.
+      - name: Save run history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: Test1/.history
+          key: cinescape-web-history-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Show pass/fail per test as a "Test results" check on the commit.
+      - name: Publish test results check
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Test results
+          path: Test1/test-results/results.xml
+          reporter: java-junit
+
+      # Keep the dashboard, Playwright report and raw results downloadable for 14 days.
+      - name: Upload reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-ui-automation-reports
+          path: |
+            Test1/dashboard/
+            Test1/playwright-report/
+            Test1/test-results/
+          retention-days: 14
+
+      # Package the dashboard folder as the GitHub Pages website.
+      - name: Upload dashboard to Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: Test1/dashboard
+
+      # Mark the run red if any test failed (after all reports are saved).
+      - name: Fail the run if any test failed
+        if: always() && steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::One or more tests failed. See the summary above or the dashboard."
+          exit 1
+
+  deploy:
+    name: Publish dashboard to GitHub Pages
+    needs: test
+    # Publish even when tests failed, so the failure details are visible on the dashboard.
+    if: always() && needs.test.result != 'cancelled'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # Publish the website uploaded by the test job.
+      - name: Deploy dashboard to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
