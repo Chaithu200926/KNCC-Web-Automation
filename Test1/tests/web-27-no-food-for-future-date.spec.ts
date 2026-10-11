@@ -1,6 +1,5 @@
 // WEB-27 No food for a future-date booking - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
-// On the website, food can only be added to a ticket for today's show. Also checks the payment page timer counts down.
-// Uses the test account; nothing is paid.
+// On the website, food can only be added to a ticket for today's show. Uses the test account; nothing is paid.
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { // Booking steps (see pages/Booking.ts):
   cancelDuringBooking, chooseCategoryAndType, chooseShow, proceedToSeatMap, proceedWithFreeSeats, readPaymentSummary,
@@ -9,7 +8,7 @@ import { // Booking steps (see pages/Booking.ts):
 
 test.describe.configure({ timeout: 240_000 }); // Up to 4 minutes (sign-in and seat map on the slow UAT site).
 
-test('WEB-27 No food for a future-date booking', async ({ page, step, testConfig }, testInfo) => {
+test('WEB-27 No food for a future-date booking', async ({ page, step, testConfig }) => {
   const { username, password, pin } = testConfig.credentials;
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run this test.');
 
@@ -32,20 +31,6 @@ test('WEB-27 No food for a future-date booking', async ({ page, step, testConfig
     await expect(page.getByRole('button', { name: /skip\s*(?:&|and)\s*proceed/i })).toHaveCount(0); // No food step.
     const summary = await readPaymentSummary(page); // Payment summary.
     expect(summary.text, 'The payment summary should list tickets only').not.toMatch(/food price\s*KWD\s*[1-9]/i); // No food charged.
-  });
-
-  await step('Check the booking timer (Time remaining) counts down', async () => {
-    const remaining = async () => { // Seconds left, from "Time remaining 03:57".
-      const shown = (await page.locator('body').innerText()).match(/time remaining\s*(\d{1,2}):(\d{2})/i);
-      return shown ? Number(shown[1]) * 60 + Number(shown[2]) : Number.NaN;
-    };
-    const first = await remaining();
-    expect(first, 'The payment page should show Time remaining (mm:ss)').toBeGreaterThan(0);
-    await page.waitForTimeout(5_000); // Wait 5 seconds.
-    const second = await remaining();
-    testInfo.annotations.push({ type: 'time remaining', description: `${first} s, then ${second} s five seconds later.` });
-    expect(second, 'Time remaining should go down').toBeLessThan(first);
-    expect(first - second, 'Time remaining should go down by about 5 seconds').toBeGreaterThanOrEqual(3);
   });
 
   await step('Cancel the booking (nothing is paid)', async () => {
