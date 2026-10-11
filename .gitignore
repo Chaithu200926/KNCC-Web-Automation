@@ -2,6 +2,7 @@
 CinescapeKiosk-API-Automation/
 CinescapeKiosk-UI-Automation/
 CinescapeAndroid-Automation/
+CinescapeCMS-Automation/
 # Installed npm packages and local test output (the web project is Test1/, with its own .gitignore).
 node_modules/
 test-results/
