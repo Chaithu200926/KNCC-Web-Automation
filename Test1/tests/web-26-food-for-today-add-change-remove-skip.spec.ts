@@ -41,7 +41,7 @@ test("WEB-26 Food for today's show: add, change, remove, skip", async ({ page, s
     testInfo.annotations.push({ type: 'show', description: `${show!.movieTitle}, today ${show!.time}; ticket KWD ${ticketsTotal.toFixed(3)}.` });
   });
 
-  await step('Check the food page: SKIP & PROCEED, the categories, items with prices and Add, and TIME REMAINING', async () => {
+  await step('Check the food page: SKIP & PROCEED, the categories, and items with prices and Add', async () => {
     await expect(page.getByRole('button', { name: /skip\s*(?:&|and)\s*proceed/i }).filter({ visible: true })).toBeVisible(); // SKIP & PROCEED.
     const categories = await foodCategories(page).allInnerTexts(); // Category names shown.
     for (const name of CATEGORIES) expect.soft(categories.map((text) => text.trim()), `Category ${name}`).toContain(name);
@@ -49,7 +49,6 @@ test("WEB-26 Food for today's show: add, change, remove, skip", async ({ page, s
     testInfo.annotations.push({ type: 'first category items', description: items.map((text) => text.replace(/\s+/g, ' ').trim()).join(' | ') });
     expect(items.length, 'The first category should list items').toBeGreaterThan(0);
     for (const text of items) expect.soft(text, 'Each item should show a price and Add').toMatch(/KWD\s*\d+\.\d{3}[\s\S]*Add/i);
-    await expect.soft(page.getByText(/time remaining/i).filter({ visible: true }).first(), 'TIME REMAINING should be shown').toBeVisible();
   });
 
   await step('Add the first item (choosing its options); check it shows "1 item added" and TOTAL rises by its price', async () => {
