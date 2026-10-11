@@ -1,4 +1,4 @@
-# CINESCAPE WEB Testing: runs every automated website test case (WEB-01..WEB-45, one spec file per case in
+# CINESCAPE WEB Testing: runs every automated website test case (WEB-01..WEB-48, one spec file per case in
 # Test1/tests/web-NN-*.spec.ts) against the Cinescape UAT website, one test at a time, each in a new incognito
 # browser context, and publishes the results:
 #   * a results table on the run page (job summary),
@@ -32,7 +32,7 @@ concurrency:
 jobs:
   test:
     name: Run the web tests
-    # A full run takes about 40 minutes (WEB-44 alone waits up to about 9 minutes for a seat hold).
+    # A full run takes about 45 minutes (WEB-44 alone waits up to about 9 minutes for a seat hold).
     timeout-minutes: 100
     runs-on: ubuntu-latest
     # All commands run inside the Playwright project folder.

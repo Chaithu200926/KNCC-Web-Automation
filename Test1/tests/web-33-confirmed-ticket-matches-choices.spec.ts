@@ -1,7 +1,7 @@
 // WEB-33 Confirmed ticket matches the choices - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Pays one ticket for tomorrow with the test wallet, checks the ticket, then cancels it (the wallet is refunded).
 // Checks after the payment are "soft" (expect.soft): a mismatch is reported, but the booking is always cancelled.
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { expectTicketMatchesChoice, flatText, type TicketChoice } from '../pages/BookingChecks'; // Ticket detail checks.
 import { // Booking steps (see pages/Booking.ts):
   bookingCard, cancelBookingInMyProfile, chooseCategoryAndType, chooseShow, openBookings, payWithWallet,
@@ -38,6 +38,9 @@ test('WEB-33 Confirmed ticket matches the choices', async ({ page, step, testCon
     expect.soft(booking.grandTotal, 'Grand Total should equal the amount to pay').toBe(amountToPay);
     expect.soft(flatText(await page.locator('body').innerText()), 'Payment Mode should be Wallet').toMatch(/Payment Mode\s*Wallet/i);
     await expect.soft(page.locator('img[src*="data:image"], canvas, svg').first(), 'A ticket QR code should be shown').toBeVisible();
+    // Add to calendar / share the ticket: not seen on UAT (11 Oct 2026). Noted, not failed.
+    const offers = page.locator('a, button').filter({ visible: true }).filter({ hasText: /calendar|share/i });
+    notOnUat(await offers.count() > 0, 'The confirmation page has no "Add to calendar" or "Share" option.');
   });
 
   await step('Check the booking card in My Account > Bookings shows the same details', async () => {

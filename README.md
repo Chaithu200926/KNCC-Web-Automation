@@ -23,13 +23,12 @@ records no trace.
 
 ### Website test cases (WEB-xx)
 
-The **Web** sheet of `KNCC-Test-Cases-All-Projects.xlsx` lists only automatable cases, numbered WEB-01..WEB-50 in
-order: the automated cases first (WEB-01..WEB-45), then the cases still planned (WEB-46..WEB-50). Each automated
+The **Web** sheet of `KNCC-Test-Cases-All-Projects.xlsx` lists only automatable cases, numbered WEB-01..WEB-51 in
+order: the automated cases first (WEB-01..WEB-48), then the cases still planned (WEB-49..WEB-51). Each automated
 case has its own spec file, `Test1/tests/web-NN-<test case name>.spec.ts`, whose test title is the case number and
 name from the sheet (e.g. "WEB-24 Seat category, seat type and ticket quantity"). All of them run in CI and on the QA PC, each in a new incognito browser context (no cookies or cache carried over from other tests,
-service workers blocked), so no cache clearing is needed. Cases still planned (no spec yet): WEB-46 credit
-card, WEB-47 bank offer, WEB-48 recharge the wallet, WEB-49 browsers and screen sizes, WEB-50 network
-lost during booking. The specs share the test account, so run them one at a time:
+service workers blocked), so no cache clearing is needed. Cases still planned (no spec yet): WEB-49 credit
+card, WEB-50 bank offer, WEB-51 recharge the wallet. The specs share the test account, so run them one at a time:
 
 ```bash
 cd Test1
@@ -40,16 +39,16 @@ npx playwright test tests/web-24-seat-category-type-quantity.spec.ts    # one te
 | Area | Test cases |
 |---|---|
 | Account | WEB-05 sign up with a new account, WEB-06 sign-up form validation, WEB-07 sign in and sign out, WEB-08 wrong details, WEB-09 forgot password, WEB-10 session stays signed in, WEB-11 profile details, WEB-12 edit profile, WEB-13 change password, WEB-37 preferences |
-| Homepage and movies | WEB-14 homepage content, WEB-15 events & promotions, WEB-16 search, WEB-17 Arabic website, WEB-18 movie lists, WEB-19 filters, WEB-20 trailer, WEB-39 movie details, WEB-40 cinema map links |
+| Homepage and movies | WEB-14 homepage content, WEB-15 events & promotions, WEB-16 search, WEB-17 Arabic website, WEB-18 movie lists, WEB-19 filters, WEB-20 trailer, WEB-39 movie details, WEB-40 cinema map links, WEB-46 browsers and screen sizes, WEB-48 live chat |
 | Showtimes and prices | WEB-21 by location, WEB-22 today and future dates, WEB-23 half-price Monday |
 | Seats and food | WEB-24 seat category / type / quantity, WEB-25 seat map rules, WEB-26 food for today's show, WEB-27 no food for a future date, WEB-38 same seat chosen by two users |
-| Holds, payment and bookings | WEB-28 price check to history, WEB-29 seat free again after going back, WEB-44 abandoned seat released for other customers, WEB-30 cancel during booking, WEB-31 payment cancelled at the gateway, WEB-32 OTP during booking, WEB-33 ticket matches the choices, WEB-34 upcoming bookings, WEB-35 history, WEB-36 cancel and wallet refund, WEB-41 refresh does not book again, WEB-42 KNET refund to the wallet, WEB-45 pay with a gift card, WEB-43 pay with an empty wallet |
+| Holds, payment and bookings | WEB-28 price check to history, WEB-29 seat free again after going back, WEB-44 abandoned seat released for other customers, WEB-30 cancel during booking, WEB-31 payment cancelled at the gateway, WEB-32 OTP during booking, WEB-33 ticket matches the choices, WEB-34 upcoming bookings, WEB-35 history, WEB-36 cancel and wallet refund, WEB-41 refresh does not book again, WEB-42 KNET refund to the wallet, WEB-45 pay with a gift card, WEB-43 pay with an empty wallet, WEB-47 network lost during booking |
 
-WEB-28, 33, 34, 36 and 41 pay with the test account's wallet and WEB-42 with the KNET test card; each cancels its
+WEB-28, 33, 34, 36, 41 and 47 pay with the test account's wallet and WEB-42 with the KNET test card; each cancels its
 booking afterwards. WEB-26 and WEB-28 need a show later the same day (food is offered for today's shows only), so
 they skip themselves late in the evening. WEB-31, 38, 43 and 44 also need the second test account (`TEST2_*`
 settings), an account with no wallet balance that never pays: WEB-31, 38 and 44 use it as a second user in a separate
-browser. WEB-05, 09 and 13 register a **new UAT user on every run** (a unique `kncc.autotest.<time>@example.com`
+browser. WEB-05, 09, 12 and 13 register a **new UAT user on every run** (a unique `kncc.autotest.<time>@example.com`
 email, so the provided accounts are never changed); on UAT the email and mobile OTP for new users is `111111`.
 
 ## Related test projects

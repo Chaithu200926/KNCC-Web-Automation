@@ -1,15 +1,16 @@
 // WEB-05 Sign up with a new account - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Registers a brand-new user (unique email at example.com and mobile number, so the provided test accounts are never
 // touched), enters the email and mobile OTPs (111111 on UAT), checks the user is signed in and My Account shows the
-// details, then signs out and signs in again with the new email and password. Each run leaves one new UAT user.
+// details, then signs out and signs in again with the new email and password. Then checks the wallet balance and that a
+// preference chosen after sign-up is saved. Each run leaves one new UAT user.
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
 import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, OTP for new users) and step() (step + screenshot).
 import { openHome } from '../pages/WebSite'; // Opens the homepage.
-import { myAccountLink, signIn, signOut } from '../pages/Account'; // Sign-in, My Account and sign-out.
+import { myAccountLink, openAccountTab, signIn, signOut } from '../pages/Account'; // Sign-in, My Account tabs and sign-out.
 import { openMessage } from '../pages/Booking'; // The site's open message pop-up.
 import { confirmSignUp, fillSignUp, newTestUser, openSignUp, signUpDialog, signUpOtpDialog } from '../pages/NewUser'; // Sign-up steps.
 
-test.describe.configure({ timeout: 240_000 }); // Up to 4 minutes (registration and two sign-ins on the slow UAT site).
+test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (registration, two sign-ins and preferences on the slow UAT site).
 
 test('WEB-05 Sign up with a new account', async ({ page, step, testConfig }, testInfo) => {
   const user = newTestUser(); // New, unique details for this run.
@@ -71,5 +72,34 @@ test('WEB-05 Sign up with a new account', async ({ page, step, testConfig }, tes
     notOnUat(values.some((value) => value.includes(shownDate) || value.includes(user.dateOfBirth)), `PROFILE does not show the Date of Birth ${shownDate} entered at sign-up (the sign-up form sends an empty date).`);
     const genderChecked = await page.locator('label').filter({ visible: true }).filter({ hasText: new RegExp(`^${user.gender}$`) }).locator('input[type="radio"]').first().isChecked().catch(() => false);
     notOnUat(genderChecked, `PROFILE does not show the Gender ${user.gender} entered at sign-up.`);
+  });
+
+  await step('Check the new account shows a wallet balance', async () => {
+    const welcome = page.locator('.account-left').filter({ visible: true }).first(); // "Welcome back ... Wallet Balance KWD x".
+    const text = (await welcome.innerText()).replace(/\s+/g, ' ');
+    testInfo.annotations.push({ type: 'new user wallet', description: text.match(/wallet balance.{0,20}/i)?.[0] ?? text.slice(0, 80) });
+    // Seen on UAT (11 Oct 2026): "Wallet Balance" with no amount and no activation step for a new account. Noted, not failed.
+    notOnUat(/wallet balance\s*KWD\s*\d/i.test(text), 'A new account shows "Wallet Balance" with no amount (no wallet activation on the website).');
+  });
+
+  await step('Choose preferences after sign-up: tick 18+, Save, reload and check the choice is kept', async () => {
+    const prefs = page.locator('div').filter({ visible: true }).filter({ hasText: /choose your preference/i }).filter({ has: page.locator('select') }).last(); // PREFERENCES form.
+    const ageRating = prefs.locator('input[type="checkbox"]'); // AGE RATING checkboxes (G, PG, 13+, 18+).
+    const ticked = () => ageRating.evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).checked));
+    await openAccountTab(page, 'PREFERENCES'); // PREFERENCES tab.
+    await expect(page.getByText(/choose your preference/i).first()).toBeVisible({ timeout: 30_000 });
+    await expect.poll(async () => (await ticked()).length, { timeout: 20_000 }).toBeGreaterThan(0); // Loaded.
+    const before = await ticked();
+    await prefs.getByText('18+', { exact: true }).click(); // Tick / untick 18+.
+    const wanted = await ticked();
+    expect(wanted, 'The 18+ box should change').not.toEqual(before);
+    await prefs.getByRole('button', { name: /^save$/i }).click(); // Save.
+    await expect.soft(openMessage(page), 'The site should confirm the save').toContainText(/updated/i, { timeout: 30_000 }); // "Your preferences have been updated."
+    if (await openMessage(page).count()) await openMessage(page).getByRole('button', { name: /^ok$/i }).click(); // OK.
+    await page.reload({ waitUntil: 'domcontentloaded' }); // Fresh copy from the server.
+    await openAccountTab(page, 'PREFERENCES');
+    await expect(page.getByText(/choose your preference/i).first()).toBeVisible({ timeout: 30_000 });
+    // Seen on UAT (11 Oct 2026): the save is accepted ("Your preferences have been updated.") but after a reload the old choice is back.
+    await expect.poll(ticked, { message: 'The saved preference should still be ticked after a reload', timeout: 20_000 }).toEqual(wanted);
   });
 });

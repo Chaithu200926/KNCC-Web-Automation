@@ -1,5 +1,6 @@
 // WEB-06 Sign up form validation - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
-// Uses the test account from .env. Nothing is saved (changes are cancelled; registration and password changes are out of scope).
+// Uses the test account from .env (its email and mobile are tried again at sign-up, which must be refused). Nothing is
+// registered: every form is invalid or refused before the OTP step.
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
 import type { BrowserContext } from '@playwright/test'; // Type of a browser window (used for a saved session).
 import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
@@ -7,10 +8,12 @@ import { HomePage } from '../pages/HomePage'; // Page object for the header (pro
 import { openHome } from '../pages/WebSite'; // Opens the homepage and waits for the movie list.
 import { // Sign-in helpers (see pages/Account.ts):
   closeMessage, completeSignIn, messagePopup, myAccountLink, openAccountTab, openMyAccount, openSignInDialog, otpDialog,
-  signIn, signInDialog, signOut, submitOtp, submitSignIn,
+  readAccountMobile, signIn, signInDialog, signOut, submitOtp, submitSignIn,
 } from '../pages/Account';
+import { openMessage } from '../pages/Booking'; // The site's open message pop-up.
+import { fillSignUp, newTestUser, openSignUp } from '../pages/NewUser'; // Sign-up form helpers.
 
-test.describe.configure({ timeout: 180_000 }); // The test may take up to 3 minutes (the UAT site can be slow).
+test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (the form checks, a sign-in and two sign-up tries).
 
 // Skip (instead of failing) when the test account is not set in .env / the CI secrets.
 test.beforeEach(({ testConfig }) => {
@@ -18,7 +21,7 @@ test.beforeEach(({ testConfig }) => {
   test.skip(!username || !password || !pin, 'Set TEST_USERNAME, TEST_PASSWORD and TEST_PIN to run the account tests.');
 });
 
-test('WEB-06 Sign up form validation', async ({ page, step, testConfig }) => {
+test('WEB-06 Sign up form validation', async ({ page, step, testConfig }, testInfo) => {
   const home = new HomePage(page); // Header helper.
   const signUp = page.locator('[role="dialog"]:visible').filter({ hasText: /sign up/i }).last(); // The SIGN UP dialog.
   const save = signUp.getByRole('button', { name: /^save$/i }); // Its Save button.
@@ -60,4 +63,36 @@ test('WEB-06 Sign up form validation', async ({ page, step, testConfig }) => {
     await expect(signInDialog(page)).toBeVisible(); // Back to the SIGN IN form.
     await home.closeProfile(); // Close the dialog.
   });
+
+  let accountMobile = ''; // The test account's mobile number (read from its PROFILE).
+  await step('Sign in, note the test account mobile number, and sign out', async () => {
+    await openHome(page, testConfig.urls.home); // Fresh page.
+    await signIn(page, testConfig.credentials); // Email, password, OTP.
+    accountMobile = await readAccountMobile(page); // My Account > PROFILE.
+    await openHome(page, testConfig.urls.home);
+    await signOut(page); // MENU > LOGOUT.
+  });
+
+  // Signing up again with details that are already registered must be refused at Save (before any OTP).
+  // Seen on UAT (11 Oct 2026): the email gets "Email address or Mobile number already registered"; the mobile gets
+  // only "Something went wrong!" (the outcome is right, the message is not clear).
+  for (const [which, clearMessage] of [['email', true], ['mobile', false]] as const) {
+    await step(`Sign up with the ${which} of the test account and check it is refused`, async () => {
+      const user = newTestUser(); // New details, except the one already registered:
+      if (which === 'email') user.email = testConfig.credentials.username; else user.mobile = accountMobile;
+      await openHome(page, testConfig.urls.home); // Fresh page.
+      await openSignUp(page); // Profile icon > SIGN IN > SIGN UP.
+      await fillSignUp(page, user); // Every field.
+      await save.click(); // Save.
+      await expect(openMessage(page), 'The site should answer with a message').toContainText(/\w{3,}/, { timeout: 30_000 });
+      const message = (await openMessage(page).innerText()).replace(/\s+/g, ' ').trim(); // e.g. "Email address ... already registered OK".
+      testInfo.annotations.push({ type: `${which} already used`, description: message });
+      expect(message, `An already registered ${which} must be refused (no OTP step)`).not.toMatch(/OTP sent/i);
+      const says = /already (?:registered|used|exists?)/i.test(message);
+      if (clearMessage) expect.soft(says, `The message should say the ${which} is already registered`).toBe(true);
+      else notOnUat(says, `An already registered ${which}: the message is "${message.replace(/\s*OK$/, '')}", not that the ${which} is already registered.`);
+      await openMessage(page).getByRole('button', { name: /^ok$/i }).click(); // OK.
+      await expect(signUp.locator('input[name="firstname"]'), 'SIGN UP should stay open (nothing registered)').toBeVisible();
+    });
+  }
 });

@@ -1,7 +1,8 @@
 // WEB-31 Payment fails or is cancelled at the gateway - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // Signs in, notes the wallet balance and upcoming bookings, books one seat for tomorrow up to KNET, clicks Cancel on the
 // KNET test gateway, and checks: no booking, no charge, and (with the second test account) the seat is free again.
-// No card details are typed.
+// Before cancelling it types a made-up, invalid card number and checks the gateway will not submit it (the real test
+// card is never typed).
 import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test accounts), step() and secondUser (second browser).
 import { flatText, readWalletBalance } from '../pages/BookingChecks'; // Text and wallet helpers.
 import { appears, openHome } from '../pages/WebSite'; // Opens the homepage; waits for a pop-up.
@@ -45,8 +46,20 @@ test('WEB-31 Payment fails or is cancelled at the gateway', async ({ page, step,
     await readPaymentSummary(page); // Payment summary loaded.
   });
 
-  await step('Choose KNET, then click Cancel on the KNET gateway', async () => {
+  await step('Choose KNET, type an invalid card number and check the gateway refuses it (Submit stays disabled)', async () => {
     await startKnetPayment(page); // KNET + Proceed: the KNET test gateway opens.
+    // Seen on the KNET test gateway (11 Oct 2026): any valid-looking card number and any PIN are APPROVED and paid, so a
+    // "declined" payment cannot be made there; an invalid number is refused before it can be sent. Submit is never clicked.
+    await expect(page.locator('#debitNumber')).toBeVisible({ timeout: 60_000 }); // Card number box.
+    await page.locator('#debitNumber').fill('1234567890123456'); // Not a card number (made up).
+    const expiry = page.getByPlaceholder('MM/YY').filter({ visible: true }).first();
+    await expiry.fill('12/30'); // Made-up expiry.
+    if (!/^\d{2}\/\d{2}$/.test(await expiry.inputValue())) { await expiry.fill(''); await expiry.pressSequentially('1230'); }
+    await page.locator('input[title*="PIN" i]').filter({ visible: true }).first().fill('1234'); // Made-up PIN.
+    await expect(page.locator('#proceed'), 'The KNET gateway should refuse an invalid card number (Submit disabled)').toBeDisabled({ timeout: 10_000 });
+  });
+
+  await step('Click Cancel on the KNET gateway', async () => {
     await page.getByRole('button', { name: /^cancel$/i }).filter({ visible: true }).first().click(); // Cancel the payment.
     const confirm = page.getByRole('button', { name: /^(?:yes|ok|confirm)$/i }).filter({ visible: true }).first(); // "Are you sure?" (if asked).
     if (await appears(confirm, 5_000)) await confirm.click();

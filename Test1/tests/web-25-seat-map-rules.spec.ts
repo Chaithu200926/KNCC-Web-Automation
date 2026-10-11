@@ -1,15 +1,17 @@
 // WEB-25 Seat map rules - one website test case (Web sheet of KNCC-Test-Cases-All-Projects.xlsx).
 // With 2 General / Standard tickets for tomorrow's show: checks the seat map (title, legend, SCREEN), that unavailable
 // seats cannot be chosen, that no more seats than tickets can be chosen, that a seat can be deselected, and that
-// PROCEED needs exactly 2 seats. Uses the test account; the booking is cancelled before paying.
+// PROCEED needs exactly 2 seats; then, with 1 ticket, whether a seat that leaves a single empty seat is stopped.
+// Uses the test account; every booking is cancelled before paying.
 // "Soft" checks (expect.soft) report a problem but let the test carry on.
-import { test, expect } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
+import { test, expect, notOnUat } from './fixtures'; // Shared setup: testConfig (site, test account) and step() (step + screenshot).
 import { // Booking steps (see pages/Booking.ts):
   cancelDuringBooking, chooseCategoryAndType, chooseShow, clickSeat, closeOpenMessage, openMessage, proceedToSeatMap,
-  proceedWithFreeSeats, seatIds, seatState, selectAvailableSeats, setTicketCount, signInAndReopenShow, type Show,
+  proceedWithFreeSeats, reopenSeatMap, seatIds, seatState, selectAvailableSeats, setTicketCount, signInAndReopenShow,
+  tryProceedFromSeatMap, type Show,
 } from '../pages/Booking';
 
-test.describe.configure({ timeout: 240_000 }); // Up to 4 minutes (sign-in and seat map on the slow UAT site).
+test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (sign-in and two seat maps on the slow UAT site).
 const TICKETS = 2; // Tickets chosen before the seat map.
 
 test('WEB-25 Seat map rules', async ({ page, step, testConfig }, testInfo) => {
@@ -83,5 +85,27 @@ test('WEB-25 Seat map rules', async ({ page, step, testConfig }, testInfo) => {
     const { next } = await proceedWithFreeSeats(page, testConfig.urls.home, show, TICKETS); // PROCEED: food page (today) or payment page (tomorrow).
     testInfo.annotations.push({ type: 'after the seat map', description: `PROCEED went to the ${next} page.` });
     await cancelDuringBooking(page); // Cancel > Yes; the seats are released.
+  });
+
+  await step('With 1 ticket, pick the second seat of a row (the first left alone) and check the site stops it', async () => {
+    await reopenSeatMap(page, testConfig.urls.home, show, 1); // Same show, 1 ticket.
+    const rows = await page.locator('tr').filter({ has: page.locator('.row-name') }).evaluateAll((trs) => trs.map((tr) => ({
+      row: (tr.querySelector('.row-name')?.textContent ?? '').trim(), // e.g. "K".
+      seats: [...tr.querySelectorAll('.seat')].filter((seatBox) => seatBox.id) // Seats in map order (gaps have no id).
+        .map((seatBox) => ({ id: seatBox.id, free: seatBox.querySelectorAll('img').length === 2 })),
+    })));
+    const row = rows.reverse().find((r) => r.seats.length > 6 && r.seats.slice(0, 3).every((seatBox) => seatBox.free)); // First 3 seats free.
+    testInfo.annotations.push({ type: 'single seat rule', description: row ? `Row ${row.row}: second seat chosen, first left alone.` : 'No row with its first three seats free; not checked.' });
+    if (!row) return;
+    await clickSeat(page, row.seats[1].id); // The second seat: the first one would be left on its own.
+    let stopped = await openMessage(page).isVisible().catch(() => false) || await seatState(page, row.seats[1].id) !== 'selected'; // Refused at once?
+    if (await openMessage(page).count()) await closeOpenMessage(page);
+    if (!stopped) { // Selected: does PROCEED refuse it?
+      const next = await tryProceedFromSeatMap(page);
+      stopped = next === 'refused';
+      if (next !== 'refused') await cancelDuringBooking(page); // Reached food / payment: cancel (nothing is paid).
+    }
+    // Seen on UAT (11 Oct 2026): the seat is selected and PROCEED goes to payment - the rule is not applied. Noted, not failed.
+    notOnUat(stopped, `Seat rule: choosing the second seat of row ${row.row} leaves the first seat alone, and the site allows it.`);
   });
 });

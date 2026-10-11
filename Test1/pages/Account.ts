@@ -74,6 +74,23 @@ export async function openAccountTab(page: Page, tab: string): Promise<Locator> 
   return link;
 }
 
+/** The values of the visible boxes on a My Account tab (radio buttons as "name:true/false"). */
+export async function visibleFieldValues(page: Page) {
+  return page.locator('input:visible').evaluateAll((inputs) => inputs.map((input) => {
+    const box = input as HTMLInputElement;
+    return box.type === 'radio' || box.type === 'checkbox' ? `${box.name}:${box.checked}` : box.value;
+  }));
+}
+
+/** Signed in: opens My Account > PROFILE and returns the account's mobile number (the 8 digits after +965). */
+export async function readAccountMobile(page: Page) {
+  await openMyAccount(page); // My Account.
+  await openAccountTab(page, 'PROFILE'); // PROFILE tab.
+  const mobile = async () => (await visibleFieldValues(page)).find((value) => /^\d{8}$/.test(value)) ?? ''; // e.g. "99xxxxxx".
+  await expect.poll(mobile, { message: 'PROFILE should show the mobile number', timeout: 20_000 }).not.toBe('');
+  return mobile();
+}
+
 /** Closes the site's message pop-up with OK (it may stay in the page afterwards, but no longer blocks it). */
 export async function closeMessage(page: Page) {
   await messagePopup(page).getByRole('button', { name: /^ok$/i }).click(); // Click OK.

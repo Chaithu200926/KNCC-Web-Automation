@@ -7,10 +7,10 @@ import { HomePage } from '../pages/HomePage'; // Page object for the header (pro
 import { openHome } from '../pages/WebSite'; // Opens the homepage and waits for the movie list.
 import { // Sign-in helpers (see pages/Account.ts):
   closeMessage, completeSignIn, messagePopup, myAccountLink, openAccountTab, openMyAccount, openSignInDialog, otpDialog,
-  signIn, signInDialog, signOut, submitOtp, submitSignIn,
+  readAccountMobile, signIn, signInDialog, signOut, submitOtp, submitSignIn,
 } from '../pages/Account';
 
-test.describe.configure({ timeout: 180_000 }); // The test may take up to 3 minutes (the UAT site can be slow).
+test.describe.configure({ timeout: 240_000 }); // Up to 4 minutes (several sign-in tries on the slow UAT site).
 
 // Skip (instead of failing) when the test account is not set in .env / the CI secrets.
 test.beforeEach(({ testConfig }) => {
@@ -19,6 +19,7 @@ test.beforeEach(({ testConfig }) => {
 });
 
 test('WEB-08 Sign in with wrong details', async ({ page, step, testConfig }, testInfo) => {
+  let accountMobile = ''; // The test account's mobile number (read from its PROFILE).
   const message = messagePopup(page); // The site's message pop-up.
   // Waits for the site's answer to a refused sign-in. The exact wording is not part of the check: UAT says
   // "User not found, Please signup" for an unknown email (8 Oct 2026), not "Please enter a valid username and password.".
@@ -64,7 +65,29 @@ test('WEB-08 Sign in with wrong details', async ({ page, step, testConfig }, tes
   await step('Enter the correct OTP and check the user is signed in', async () => {
     await submitOtp(page, testConfig.credentials.pin); // Correct OTP.
     await expect(myAccountLink(page)).toBeAttached({ timeout: 30_000 }); // Signed in.
+    accountMobile = await readAccountMobile(page); // The account's mobile number (for the next step).
+    await openHome(page, testConfig.urls.home);
     await signOut(page); // Sign out again.
+  });
+
+  await step('Sign in with the mobile number instead of the email and check what happens', async () => {
+    await openHome(page, testConfig.urls.home); // Fresh page.
+    await openSignInDialog(page); // Profile icon > SIGN IN (its box is labelled "Email").
+    await submitSignIn(page, accountMobile, testConfig.credentials.password); // Mobile number + the right password.
+    // Seen on UAT (11 Oct 2026): "User not found, Please signup" - the website signs in by email only. Noted, not failed.
+    const otpAsked = await expect(otpDialog(page)).toBeVisible({ timeout: 20_000 }).then(() => true, () => false);
+    notOnUat(otpAsked, 'Sign in with mobile number + password is not offered: the website signs in by email only.');
+    if (otpAsked) { // Accepted: finish with the OTP, then sign out again.
+      await submitOtp(page, testConfig.credentials.pin);
+      await expect(myAccountLink(page), 'Mobile + password + OTP should sign in').toBeAttached({ timeout: 30_000 });
+      await signOut(page);
+    } else {
+      if (await messagePopup(page).isVisible().catch(() => false)) {
+        testInfo.annotations.push({ type: 'mobile sign-in message', description: (await messagePopup(page).innerText()).replace(/\s+/g, ' ').trim() });
+        await closeMessage(page); // OK.
+      }
+      await expect(myAccountLink(page)).toHaveCount(0); // Still signed out.
+    }
   });
 
   await step('Submit SIGN IN with Email and Password empty and check the form stays usable', async () => {
