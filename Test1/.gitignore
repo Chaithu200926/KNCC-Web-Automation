@@ -19,3 +19,7 @@ node_modules/
 /dashboard-pre-uat/
 # Merged UAT / Pre-UAT results behind the checklist (scripts/build-site-checklist.js).
 /site-checklist/
+# Local-only files: zipped report folders (too big for GitHub), one-off probe scripts, editor workspace.
+*.zip
+/explore/
+*.code-workspace
