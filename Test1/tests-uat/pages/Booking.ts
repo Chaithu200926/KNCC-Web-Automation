@@ -6,6 +6,7 @@ import { expect, Locator, Page } from '@playwright/test'; // Playwright's checks
 import { completeSignIn, signInDialog, type Credentials } from './Account'; // Sign-in with email, password and OTP.
 import { flatText, readKwd, readKwdAfter, readSummarySeat, titlePattern } from './BookingChecks'; // Text helpers.
 import { appears, kuwaitMinutesNow, minutesOf, openHome } from './WebSite'; // Page helpers.
+import { onSite } from '../site'; // Pattern for this folder's website address.
 
 /** What was chosen for a booking (filled in step by step). */
 export interface Show {
@@ -453,7 +454,17 @@ export async function startKnetPayment(page: Page) {
   if (!await knet.isVisible().catch(() => false)) await page.getByRole('button', { name: /pay with debit or credit card/i }).last().click(); // Open the card section.
   await knet.click(); // Choose KNET.
   await page.getByRole('button', { name: 'Proceed', exact: true }).last().click(); // Proceed to the gateway.
-  await page.waitForURL(/kpay/i, { timeout: 60_000 }); // KNET test gateway (kpaytest.com.kw).
+  await expectKnetGateway(page); // KNET test gateway (kpaytest.com.kw).
+}
+
+/**
+ * After Proceed to KNET: waits for the KNET test gateway. If the site sends the customer to its failure page
+ * instead (bookingconfirm?result=fail&errorStatus=...), fails at once with the site's own reason.
+ */
+export async function expectKnetGateway(page: Page) {
+  await page.waitForURL(/kpay|bookingconfirm\?result=fail/i, { timeout: 60_000 }); // Gateway, or the site's failure page.
+  const url = new URL(page.url());
+  expect(url.searchParams.get('result'), `The KNET payment should start; the site answered "${url.searchParams.get('errorStatus') ?? ''}"`).not.toBe('fail');
 }
 
 /** Pays with KNET on the KNET test gateway and waits for the confirmation page (same steps as WEB-04). */
@@ -471,8 +482,8 @@ export async function payWithKnet(page: Page, card: KnetCard) {
   await pin.fill(card.knetPin); // PIN.
   await page.getByRole('button', { name: /^submit$/i }).filter({ visible: true }).first().click(); // Submit.
   const confirm = page.getByRole('button', { name: /^confirm$/i }).filter({ visible: true }).first(); // Optional Confirm page.
-  await expect.poll(async () => /cinescape\.com\.kw/i.test(page.url()) || await confirm.isVisible().catch(() => false), { timeout: 60_000 }).toBe(true);
-  if (!/cinescape\.com\.kw/i.test(page.url())) await confirm.click(); // Confirm the payment if asked.
+  await expect.poll(async () => onSite.test(page.url()) || await confirm.isVisible().catch(() => false), { timeout: 60_000 }).toBe(true);
+  if (!onSite.test(page.url())) await confirm.click(); // Confirm the payment if asked.
   await expect(page).toHaveURL(/bookingconfirm\?result=success/i, { timeout: 90_000 }); // Confirmation page.
   return rememberPaid(page, await readConfirmation(page)); // Booking ID, date & time, Grand Total.
 }

@@ -61,11 +61,26 @@ export const sendEmailOtpButton = (page: Page) => page.locator('[role="dialog"]:
  */
 export async function submitOtp(page: Page, otp: string) {
   const boxes = otpDialog(page).locator('input:not([type="hidden"])'); // The OTP boxes.
-  await expect(boxes.first().or(sendEmailOtpButton(page))).toBeVisible({ timeout: 60_000 }); // OTP boxes or the choice (sign-in can take up to a minute).
-  if (await sendEmailOtpButton(page).isVisible()) await sendEmailOtpButton(page).click(); // VERIFY USER: Send Email OTP.
+  await expect(boxes.first().or(sendEmailOtpButton(page)).first()).toBeVisible({ timeout: 60_000 }); // OTP boxes or the choice (sign-in can take up to a minute).
+  if (!(await boxes.first().isVisible()) && await sendEmailOtpButton(page).isVisible()) await sendEmailOtpButton(page).click(); // VERIFY USER: Send Email OTP (only when no code boxes yet).
   await expect(boxes.first()).toBeVisible({ timeout: 60_000 }); // The OTP boxes.
-  for (let index = 0; index < otp.length; index += 1) await boxes.nth(index).fill(otp[index]); // One digit per box.
-  await otpDialog(page).getByRole('button', { name: /submit/i }).click(); // Submit.
+  // The site can refuse a correct OTP with "Please wait N seconds before requesting another OTP" (its OTP limit,
+  // answered by /api/customer/verifyUser): then close the message, wait that long and submit again.
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    for (let index = 0; index < otp.length; index += 1) await boxes.nth(index).fill(otp[index]); // One digit per box.
+    const answer = page.waitForResponse((response) => /\/api\/customer\/verifyUser$/i.test(new URL(response.url()).pathname), { timeout: 30_000 })
+      .then((response) => response.json(), () => null).catch(() => null); // The site's answer to Submit (if it uses that call).
+    await otpDialog(page).getByRole('button', { name: /submit/i }).click(); // Submit.
+    const closed = expect(otpDialog(page)).toBeHidden({ timeout: 30_000 }).then(() => null, () => null); // Accepted: the dialog closes.
+    const message = String((await Promise.race([answer, closed]))?.msg ?? '');
+    const wait = /please wait\s*(?:(\d+)\s*minutes?)?\s*(?:(\d+)\s*seconds?)?\s*before requesting another otp/i.exec(message);
+    if (!wait || attempt === 3) return;
+    const waitMs = (Number(wait[1] ?? 0) * 60 + Number(wait[2] ?? 0) + 3) * 1000; // The time asked for, plus 3 s.
+    test.info().annotations.push({ type: 'OTP limit', description: `OTP refused: "${message}" Waited ${Math.round(waitMs / 1000)} s and submitted again.` });
+    test.info().setTimeout(test.info().timeout + waitMs + 60_000); // Room for the wait and the next try.
+    if (await messagePopup(page).isVisible()) await closeMessage(page); // The message > OK.
+    await page.waitForTimeout(waitMs); // Wait until the site accepts OTPs again.
+  }
 }
 
 /** Full sign-in from the open dialog: email + password, then the email OTP; waits until signed in. */

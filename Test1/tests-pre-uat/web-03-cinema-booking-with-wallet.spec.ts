@@ -94,8 +94,8 @@ test('WEB-03 Cinema booking with wallet, confirmed and cancelled in My Profile',
     const otpDialog = page.locator('[role="dialog"]:visible').last(); // The OTP pop-up that follows.
     const otpInputs = otpDialog.locator('input:not([type="hidden"])'); // One box per OTP digit.
     const sendEmailOtp = page.getByRole('button', { name: /send email otp/i }); // This site first asks: Send SMS OTP / Send Email OTP.
-    await expect(otpInputs.first().or(sendEmailOtp)).toBeVisible({ timeout: 60_000 }); // OTP boxes or the choice (sign-in can take up to a minute).
-    if (await sendEmailOtp.isVisible()) await sendEmailOtp.click(); // VERIFY USER: Send Email OTP.
+    await expect(otpInputs.first().or(sendEmailOtp).first()).toBeVisible({ timeout: 60_000 }); // OTP boxes or the choice (sign-in can take up to a minute).
+    if (!(await otpInputs.first().isVisible()) && await sendEmailOtp.isVisible()) await sendEmailOtp.click(); // VERIFY USER: Send Email OTP (only when no code boxes yet).
     await expect(otpInputs.first()).toBeVisible({ timeout: 60_000 }); // Wait for the OTP boxes (sign-in can take up to a minute on UAT).
     await captureStep('08-email-otp-form', otpInputs.first(), 'STEP 8 - ENTER EMAIL OTP'); // Screenshot them.
     for (let index = 0; index < await otpInputs.count(); index += 1) {

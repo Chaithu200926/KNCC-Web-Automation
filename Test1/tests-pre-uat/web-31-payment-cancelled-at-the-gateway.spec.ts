@@ -12,6 +12,7 @@ import { // Booking steps (see pages/Booking.ts):
   proceedWithFreeSeats, readPaymentSummary, selectAvailableSeats, signInAndReopenShow, skipFood, startKnetPayment,
   tryToReserveSeat, upcomingBookingIds, type Show,
 } from './pages/Booking';
+import { onSite } from './site'; // Pattern for this folder's website address.
 
 test.describe.configure({ timeout: 420_000 }); // Up to 7 minutes (two sign-ins, the gateway and checks on the slow UAT site).
 const fils = (kwd: number) => Math.round(kwd * 1000); // KWD → fils (whole numbers).
@@ -63,7 +64,7 @@ test('WEB-31 Payment fails or is cancelled at the gateway', async ({ page, step,
     await page.getByRole('button', { name: /^cancel$/i }).filter({ visible: true }).first().click(); // Cancel the payment.
     const confirm = page.getByRole('button', { name: /^(?:yes|ok|confirm)$/i }).filter({ visible: true }).first(); // "Are you sure?" (if asked).
     if (await appears(confirm, 5_000)) await confirm.click();
-    await page.waitForURL(/cinescape\.com\.kw/i, { timeout: 60_000 }); // Back on the Cinescape site.
+    await page.waitForURL(onSite, { timeout: 60_000 }); // Back on the Cinescape site.
   });
 
   await step('Check a clear failure message and no Booking ID', async () => {

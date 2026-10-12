@@ -49,6 +49,13 @@ export async function foodCount(item: Locator) {
  */
 export async function addFood(page: Page, item: Locator, quantity = 1) {
   const before = await foodCount(item); // Already in the cart.
+  // On this site an item already in the cart shows "- n +" on its card instead of Add: use "+" there.
+  const plus = item.locator('.counter-button button').last();
+  if (before > 0 && !await item.getByRole('button', { name: /^add$/i }).isVisible() && await plus.isVisible()) {
+    for (let added = 0; added < quantity; added += 1) await plus.click(); // "+" once per item.
+    await expect.poll(() => foodCount(item), { message: `The item should be in the cart ${before + quantity} time(s)` }).toBe(before + quantity);
+    return;
+  }
   await item.getByRole('button', { name: /^add$/i }).click(); // Add.
   const options = foodOptions(page);
   await expect.poll(async () => await options.isVisible() || await foodCount(item) > before, { timeout: 15_000 }).toBe(true); // Window or added.

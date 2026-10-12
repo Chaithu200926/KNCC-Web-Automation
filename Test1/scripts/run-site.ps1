@@ -22,6 +22,9 @@ param(
   [string] $Checklist = 'C:\softwares\KNCC testing\Cinescape UAT and Pre-UAT Checklist.html'
 )
 
+# -Tests web-26,web-31 arrives as one string through "powershell -File": split it into separate filters.
+$Tests = @($Tests | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 $root = Split-Path -Parent $PSScriptRoot # The Test1 folder.
 Set-Location $root
 $sites = @{ 'uat' = 'http://10.35.1.66:8103'; 'pre-uat' = 'http://10.35.1.66:8123' }

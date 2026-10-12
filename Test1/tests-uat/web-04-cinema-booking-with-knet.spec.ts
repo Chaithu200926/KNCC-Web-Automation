@@ -11,6 +11,8 @@ import { // Shared booking steps (see pages/Booking.ts):
   bookingCard, noteCancelledBooking, notePaidBooking, openBookings, proceedWithFreeSeats, seat, selectAvailableSeats,
   type Show,
 } from './pages/Booking';
+import { onSite } from './site';
+import { expectKnetGateway } from './pages/Booking'; // Waits for KNET, or fails with the site's reason. // Pattern for this folder's website address.
 
 // Slow every browser action down by 300 ms so the recorded video is easy to follow.
 // Traces are switched off for this test because a trace records the text typed into fields,
@@ -109,8 +111,8 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     const otpDialog = page.locator('[role="dialog"]:visible').last(); // The OTP pop-up that follows.
     const otpInputs = otpDialog.locator('input:not([type="hidden"])'); // One box per OTP digit.
     const sendEmailOtp = page.getByRole('button', { name: /send email otp/i }); // This site first asks: Send SMS OTP / Send Email OTP.
-    await expect(otpInputs.first().or(sendEmailOtp)).toBeVisible({ timeout: 60_000 }); // OTP boxes or the choice (sign-in can take up to a minute).
-    if (await sendEmailOtp.isVisible()) await sendEmailOtp.click(); // VERIFY USER: Send Email OTP.
+    await expect(otpInputs.first().or(sendEmailOtp).first()).toBeVisible({ timeout: 60_000 }); // OTP boxes or the choice (sign-in can take up to a minute).
+    if (!(await otpInputs.first().isVisible()) && await sendEmailOtp.isVisible()) await sendEmailOtp.click(); // VERIFY USER: Send Email OTP (only when no code boxes yet).
     await expect(otpInputs.first()).toBeVisible({ timeout: 60_000 }); // Wait for the OTP boxes (sign-in can take up to a minute on UAT).
     await captureStep('08-email-otp-form', otpInputs.first(), 'STEP 8 - ENTER EMAIL OTP'); // Screenshot them.
     for (let index = 0; index < await otpInputs.count(); index += 1) {
@@ -294,7 +296,7 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     await captureStep('19-knet-proceed', proceedToKnet, 'STEP 19 - PROCEED TO KNET'); // Screenshot it.
     await proceedToKnet.click(); // Go to the KNET gateway.
 
-    await page.waitForURL(/kpay/i, { timeout: 60_000 }); // Browser moves to the KNET test gateway (kpaytest.com.kw).
+    await expectKnetGateway(page); // Browser moves to the KNET test gateway (kpaytest.com.kw), or fails with the site's reason.
     await page.waitForLoadState('domcontentloaded'); // Wait for the KNET page to load.
 
     // The KNET page also holds hidden forms (saved card, OTP), so only visible fields are used.
@@ -325,9 +327,9 @@ test('WEB-04 Cinema booking with KNET, confirmed and cancelled in My Profile', a
     // The gateway may show a "Confirm" page before returning to Cinescape; click it if it appears.
     const knetConfirm = page.getByRole('button', { name: /^confirm$/i }).filter({ visible: true }).first(); // KNET "Confirm" button.
     await expect.poll(async () =>
-      /cinescape\.com\.kw/i.test(page.url()) || await knetConfirm.isVisible().catch(() => false), // Back on Cinescape, or Confirm shown?
+      onSite.test(page.url()) || await knetConfirm.isVisible().catch(() => false), // Back on Cinescape, or Confirm shown?
     { timeout: 60_000 }).toBe(true); // Wait up to 60 s for either.
-    if (!/cinescape\.com\.kw/i.test(page.url())) { // Still on KNET, so it is the Confirm page:
+    if (!onSite.test(page.url())) { // Still on KNET, so it is the Confirm page:
       await clickWithHighlight('19d-knet-confirm', knetConfirm, 'STEP 19D - CONFIRM KNET PAYMENT', true); // confirm the payment.
     }
 
