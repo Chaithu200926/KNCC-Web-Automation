@@ -11,12 +11,15 @@
   Reports per site (screenshots of every step, a video of every test, a trace of every failure):
     playwright-report-<site>\index.html    Playwright HTML report
     dashboard-<site>\index.html            Dashboard (summary, steps, screenshots, videos)
+    Cinescape UAT and Pre-UAT Checklist.html  WEB-01..48 on both sites (C:\softwares\KNCC testing, -Checklist to change)
     test-results-<site>\                   Raw files: results.json, results.xml, test-execution.log.txt, videos, screenshots
 #>
 param(
   [ValidateSet('uat', 'pre-uat', 'both')] [string] $Site = 'both',
   [string[]] $Tests = @(),
-  [switch] $NoOpen
+  [switch] $NoOpen,
+  # UAT / Pre-UAT checklist (WEB-01..48, one column per site), rebuilt after every run.
+  [string] $Checklist = 'C:\softwares\KNCC testing\Cinescape UAT and Pre-UAT Checklist.html'
 )
 
 $root = Split-Path -Parent $PSScriptRoot # The Test1 folder.
@@ -49,10 +52,14 @@ foreach ($name in $toRun) {
   node scripts/generate-dashboard.js
   Remove-Item Env:RESULTS_FILE, Env:DASHBOARD_DIR, Env:SITE_URL
 
+  # This run's results into the UAT / Pre-UAT checklist (cases not in this run keep their last result).
+  if (Test-Path "test-results-$name/results.json") { node scripts/build-site-checklist.js --add $name --out $Checklist }
+
   $minutes = [math]::Round(((Get-Date) - $started).TotalMinutes, 1)
   Write-Host "$name finished in $minutes min (exit code $exitCode)." -ForegroundColor Cyan
   Write-Host "  Dashboard:   $root\dashboard-$name\index.html"
   Write-Host "  HTML report: $root\playwright-report-$name\index.html"
+  Write-Host "  Checklist:   $Checklist"
   Write-Host "  Shared results page: https://claude.ai/artifact/UzdLjEWvjG7hAMRXirbqfm (Load results > $root\test-results-$name\results.json)"
   if (-not $NoOpen -and (Test-Path "dashboard-$name\index.html")) { Start-Process "dashboard-$name\index.html" }
 }

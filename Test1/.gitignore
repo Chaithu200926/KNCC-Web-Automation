@@ -17,3 +17,5 @@ node_modules/
 /.history/
 /dashboard-uat/
 /dashboard-pre-uat/
+# Merged UAT / Pre-UAT results behind the checklist (scripts/build-site-checklist.js).
+/site-checklist/
