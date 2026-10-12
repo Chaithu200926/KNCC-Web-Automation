@@ -7,9 +7,16 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
+    "test:uat": "playwright test -c playwright.uat.config.ts",
+    "test:pre-uat": "playwright test -c playwright.pre-uat.config.ts",
+    "report:uat": "playwright show-report playwright-report-uat",
+    "report:pre-uat": "playwright show-report playwright-report-pre-uat",
     "report": "playwright show-report",
     "dashboard": "node scripts/generate-dashboard.js",
-    "portal": "node team-portal/server.js"
+    "portal": "node team-portal/server.js",
+    "site:uat": "powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site uat",
+    "site:pre-uat": "powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site pre-uat",
+    "site:both": "powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site both"
   },
   "keywords": [],
   "author": "",

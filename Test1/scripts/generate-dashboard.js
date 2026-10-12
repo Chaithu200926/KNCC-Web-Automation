@@ -11,8 +11,9 @@ const root = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(root, '.env'), quiet: true });
 
 // Input (Playwright JSON results), output folder, screenshot/video folder and run history.
-const resultsPath = path.join(root, 'test-results', 'results.json');
-const outputDir = path.join(root, 'dashboard');
+// RESULTS_FILE / DASHBOARD_DIR / SITE_URL let a run of another website (scripts/run-site.ps1) build its own dashboard.
+const resultsPath = process.env.RESULTS_FILE ? path.resolve(root, process.env.RESULTS_FILE) : path.join(root, 'test-results', 'results.json');
+const outputDir = process.env.DASHBOARD_DIR ? path.resolve(root, process.env.DASHBOARD_DIR) : path.join(root, 'dashboard');
 const assetDir = path.join(outputDir, 'assets');
 // On GitHub the workflow restores the history from its cache and points HISTORY_FILE at it.
 const historyPath = process.env.HISTORY_FILE || path.join(outputDir, 'history.json');
@@ -241,7 +242,7 @@ const run = {
   node: process.version,
   playwright: pkgVersion('@playwright/test'),
   browser: [...new Set(tests.map((t) => t.browser))].join(', ') || 'chromium',
-  site: process.env.BASE_URL || 'https://uatweb.cinescape.com.kw',
+  site: process.env.SITE_URL || process.env.BASE_URL || 'https://uatweb.cinescape.com.kw',
   started,
   finished: new Date(started.getTime() + wallMs),
   wallMs,

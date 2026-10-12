@@ -5,9 +5,22 @@
     "moduleResolution": "Node16",
     "strict": true,
     "esModuleInterop": true,
-    "types": ["node", "@playwright/test"],
+    "types": [
+      "node",
+      "@playwright/test"
+    ],
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["playwright.config.ts", "config/**/*.ts", "pages/**/*.ts", "tests/**/*.ts", "reporters/**/*.ts"]
+  "include": [
+    "playwright.config.ts",
+    "playwright.uat.config.ts",
+    "playwright.pre-uat.config.ts",
+    "config/**/*.ts",
+    "pages/**/*.ts",
+    "tests/**/*.ts",
+    "tests-uat/**/*.ts",
+    "tests-pre-uat/**/*.ts",
+    "reporters/**/*.ts"
+  ]
 }

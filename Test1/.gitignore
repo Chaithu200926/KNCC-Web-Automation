@@ -3,7 +3,11 @@
 node_modules/
 .env
 /test-results/
+/test-results-uat/
+/test-results-pre-uat/
 /playwright-report/
+/playwright-report-uat/
+/playwright-report-pre-uat/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
@@ -11,3 +15,5 @@ node_modules/
 /team-portal/data/
 # Run history used by the dashboard trend chart (kept in the GitHub Actions cache).
 /.history/
+/dashboard-uat/
+/dashboard-pre-uat/
