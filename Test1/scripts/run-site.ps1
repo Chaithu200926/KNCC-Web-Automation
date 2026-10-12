@@ -53,5 +53,6 @@ foreach ($name in $toRun) {
   Write-Host "$name finished in $minutes min (exit code $exitCode)." -ForegroundColor Cyan
   Write-Host "  Dashboard:   $root\dashboard-$name\index.html"
   Write-Host "  HTML report: $root\playwright-report-$name\index.html"
+  Write-Host "  Shared results page: https://claude.ai/artifact/UzdLjEWvjG7hAMRXirbqfm (Load results > $root\test-results-$name\results.json)"
   if (-not $NoOpen -and (Test-Path "dashboard-$name\index.html")) { Start-Process "dashboard-$name\index.html" }
 }
