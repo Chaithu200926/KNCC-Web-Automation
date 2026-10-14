@@ -92,7 +92,7 @@ test('WEB-25 Seat map rules', async ({ page, step, testConfig }, testInfo) => {
     const rows = await page.locator('tr').filter({ has: page.locator('.row-name') }).evaluateAll((trs) => trs.map((tr) => ({
       row: (tr.querySelector('.row-name')?.textContent ?? '').trim(), // e.g. "K".
       seats: [...tr.querySelectorAll('.seat')].filter((seatBox) => seatBox.id) // Seats in map order (gaps have no id).
-        .map((seatBox) => ({ id: seatBox.id, free: seatBox.querySelectorAll('img').length === 2 })),
+        .map((seatBox) => ({ id: seatBox.id, free: seatBox.querySelectorAll('img').length === 2 && !seatBox.classList.contains('blocked') })), // Pre-UAT: "blocked" seats keep 2 pictures.
     })));
     const row = rows.reverse().find((r) => r.seats.length > 6 && r.seats.slice(0, 3).every((seatBox) => seatBox.free)); // First 3 seats free.
     testInfo.annotations.push({ type: 'single seat rule', description: row ? `Row ${row.row}: second seat chosen, first left alone.` : 'No row with its first three seats free; not checked.' });

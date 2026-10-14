@@ -184,6 +184,8 @@ export async function proceedToSeatMap(page: Page) {
 //   but has a single dark grey picture and no number;
 // - empty places in a row are seats with id="".
 // The legend uses other (larger) pictures, so seats are recognised by this structure, not by comparing pictures.
+// Pre-UAT (13 Oct 2026): blocked seats (a fixed pattern, e.g. seats 2 and 13 of row I and the rows below it) keep the free-seat structure
+// (number + two pictures) but get the class "blocked" and are drawn dark grey like Unavailable; they cannot be selected.
 
 /** The state of a seat on the map. */
 export type SeatState = 'available' | 'unavailable' | 'selected' | 'other';
@@ -195,7 +197,8 @@ export const seat = (page: Page, id: string) => page.locator(`.seat[id="${id}"]`
 export async function seatStates(page: Page): Promise<Record<string, SeatState>> {
   return page.locator('.seat[id]:not([id=""])').evaluateAll((seats) => Object.fromEntries(seats.map((element) => {
     const pictures = element.querySelectorAll('img').length; // 2 = free seat, 1 = unavailable seat.
-    const state = element.classList.contains('active') ? 'selected' : pictures === 2 ? 'available' : pictures === 1 ? 'unavailable' : 'other';
+    const state = element.classList.contains('active') ? 'selected' : element.classList.contains('blocked') ? 'unavailable'
+      : pictures === 2 ? 'available' : pictures === 1 ? 'unavailable' : 'other';
     return [element.id, state];
   })));
 }
@@ -236,12 +239,18 @@ export async function selectAvailableSeats(page: Page, count: number, avoid: str
     const j = Math.floor(Math.random() * (i + 1));
     [free[i], free[j]] = [free[j], free[i]];
   }
-  const chosen: string[] = [];
+  // Pre-UAT (13 Oct 2026): with 2 or more tickets one click can select the seat next to it as well, so the seats
+  // selected are counted from the map after each click, not only the seat clicked.
+  const before = await seatIds(page, 'selected'); // Seats already selected (kept).
+  const newlySelected = async () => (await seatIds(page, 'selected')).filter((id) => !before.includes(id));
   for (const id of free) { // Free seats, in random order.
-    if (chosen.length === count) break;
+    if ((await newlySelected()).length >= count) break;
+    if (await seatState(page, id) !== 'available') continue; // Selected with its neighbour by an earlier click.
     await clickSeat(page, id); // Click the seat.
-    if (await seatState(page, id) === 'selected') chosen.push(id); // Now selected.
+    await expect.poll(() => seatState(page, id), { timeout: 3_000 }).not.toBe('available').catch(() => undefined); // Drawn.
+    if (await openMessage(page).count()) await closeOpenMessage(page); // e.g. "Please select only 2 seat(s)": OK.
   }
+  const chosen = await newlySelected();
   expect(chosen.length, `${count} available seat(s) should be selected`).toBe(count);
   return chosen;
 }
