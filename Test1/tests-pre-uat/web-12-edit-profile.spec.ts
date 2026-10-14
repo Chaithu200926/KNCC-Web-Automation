@@ -10,7 +10,7 @@ import { // Sign-in helpers (see pages/Account.ts):
   closeMessage, completeSignIn, messagePopup, myAccountLink, openAccountTab, openMyAccount, openSignInDialog, otpDialog,
   signIn, signInDialog, signOut, submitOtp, submitSignIn, visibleFieldValues,
 } from './pages/Account';
-import { registerNewUser } from './pages/NewUser'; // Registers a new UAT user for the save checks.
+import { pickDateOfBirth, registerNewUser } from './pages/NewUser'; // Registers a new UAT user for the save checks.
 
 test.describe.configure({ timeout: 360_000 }); // Up to 6 minutes (two accounts, a registration and reloads on the slow UAT site).
 
@@ -66,8 +66,7 @@ test('WEB-12 Edit profile', async ({ page, step, testConfig }, testInfo) => {
     await page.getByText(/^edit$/i).first().click(); // Edit.
     const texts = page.locator('input[type="text"]:visible'); // User Name, First Name, Last Name, ..., Mobile.
     await texts.nth(1).fill(changes.firstName); // First Name.
-    await page.locator('.react-datepicker__input-container input').filter({ visible: true }).first().fill(changes.dateOfBirth); // Date of Birth.
-    await page.keyboard.press('Escape'); // Close the calendar.
+    await pickDateOfBirth(page, page.locator('.react-datepicker__input-container input').filter({ visible: true }).first(), changes.dateOfBirth); // Date of Birth (Pre-UAT: picked in the calendar).
     await page.locator('input[type="email"]:visible').first().fill(changes.email); // Email.
     const mobileIndex = (await texts.evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).value))).indexOf(user.mobile);
     expect(mobileIndex, 'The mobile box should show the current number').toBeGreaterThanOrEqual(0);

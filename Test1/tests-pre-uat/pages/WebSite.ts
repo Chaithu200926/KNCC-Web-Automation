@@ -122,3 +122,16 @@ export async function bannerMovies(page: Page) {
 
 /** Current time in Kuwait (UTC+3) as minutes since midnight (the test machine may be in another time zone). */
 export const kuwaitMinutesNow = (now = new Date()) => ((now.getUTCHours() + 3) % 24) * 60 + now.getUTCMinutes();
+
+/**
+ * Closes the live chat panel if it is open. Pre-UAT (14 Oct 2026): the chat (Pair AI) opens by itself on some pages
+ * (e.g. My Account) and covers the right side of the page; a customer closes it with the round "Chat with us!" button.
+ */
+export async function closeChatPanel(page: Page) {
+  const holder = page.locator('#pair-ai-widget-holder');
+  const open = async () => await holder.isVisible().catch(() => false) && !/pair-ai--hide/.test(await holder.getAttribute('class') ?? '');
+  if (!await open()) return;
+  await page.locator('button.pair-ai-bubble').filter({ visible: true }).first().click(); // The round button (an X while open).
+  await expect.poll(open, { message: 'The chat panel should close' }).toBe(false);
+}
+

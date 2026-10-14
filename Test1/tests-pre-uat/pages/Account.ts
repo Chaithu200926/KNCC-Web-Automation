@@ -1,6 +1,7 @@
 // Sign-in / sign-out helpers for the website test cases (WEB-xx) that need the test account.
 // The account details come from .env (TEST_USERNAME, TEST_PASSWORD, TEST_PIN = the email OTP on UAT).
 import { expect, Locator, Page, test } from '@playwright/test'; // Playwright's checks, types and the running test.
+import { closeChatPanel } from './WebSite'; // Closes the live chat panel.
 
 export interface Credentials { username: string; password: string; pin: string } // Test account from testConfig.credentials.
 
@@ -115,6 +116,7 @@ export async function openMyAccount(page: Page) {
 /** Opens a My Account tab (PROFILE, BOOKINGS, PREFERENCES, RECHARGE WALLET, HISTORY). */
 export async function openAccountTab(page: Page, tab: string): Promise<Locator> {
   const link = page.getByText(new RegExp(`^${tab}$`, 'i')).first(); // The tab by its name.
+  await closeChatPanel(page); // Pre-UAT: the chat panel may cover the tabs.
   await link.click(); // Open it.
   return link;
 }

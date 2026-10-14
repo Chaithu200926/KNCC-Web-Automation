@@ -37,7 +37,13 @@ test('WEB-33 Confirmed ticket matches the choices', async ({ page, step, testCon
     expect.soft(booking.bookingId, 'The confirmation page should show a Booking ID').toMatch(/^\w{5,}$/);
     expect.soft(booking.grandTotal, 'Grand Total should equal the amount to pay').toBe(amountToPay);
     expect.soft(flatText(await page.locator('body').innerText()), 'Payment Mode should be Wallet').toMatch(/Payment Mode\s*Wallet/i);
-    await expect.soft(page.locator('img[src*="data:image"], canvas, svg').first(), 'A ticket QR code should be shown').toBeVisible();
+    // Pre-UAT (14 Oct 2026): the page also holds hidden icons, so the QR code is found as a shown square picture
+    // (canvas, svg or inline image) at least 80 px wide, next to the Booking ID.
+    const qrShown = () => page.locator('canvas, svg, img[src*="data:image"]').evaluateAll((pictures) => pictures.some((picture) => {
+      const box = picture.getBoundingClientRect();
+      return box.width >= 80 && Math.abs(box.width - box.height) <= 4 && getComputedStyle(picture).visibility !== 'hidden';
+    }));
+    await expect.soft.poll(qrShown, { message: 'A ticket QR code should be shown' }).toBe(true);
     // Add to calendar / share the ticket: not seen on UAT (11 Oct 2026). Noted, not failed.
     const offers = page.locator('a, button').filter({ visible: true }).filter({ hasText: /calendar|share/i });
     notOnUat(await offers.count() > 0, 'The confirmation page has no "Add to calendar" or "Share" option.');

@@ -34,12 +34,39 @@ export async function foodPrice(item: Locator) {
   return readKwd(await item.locator('.food-price').innerText()); // "KWD 2.000".
 }
 
-/** How many of an item are in the cart: "2 items added" under its Add button (0 while nothing is added). */
+/**
+ * The booking bar's cart. Pre-UAT (14 Oct 2026): an added item no longer shows a count on its card; the collapsed bar
+ * lists it as "<name> Added" next to TOTAL, and the arrow above the bar opens BOOKING INFORMATION with FOOD: each item
+ * with its "- n +" quantity and Remove. TOTAL is read from the collapsed bar, so the bar is always closed again.
+ */
+const cartBar = (page: Page) => page.locator('.booked-info-fixed').filter({ visible: true }).first();
+const itemName = async (item: Locator) => (await item.locator('h4').innerText()).trim(); // e.g. "Combo 2".
+const exactly = (text: string) => new RegExp(`^\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`); // The whole text.
+/** The item's line in the open cart (picture, name, price, "- n +", Remove). */
+const cartLine = (page: Page, name: string) => cartBar(page).locator('.booked-food-full .food-quantity-container')
+  .filter({ has: page.locator('h5').filter({ hasText: exactly(name) }) });
+
+/** Opens the cart in the booking bar, runs the action, and closes the cart again. */
+async function inOpenCart<T>(page: Page, action: () => Promise<T>): Promise<T> {
+  await cartBar(page).locator('.scroll-up').click(); // The arrow: BOOKING INFORMATION opens.
+  await expect(cartBar(page).locator('.booked-active')).toBeVisible();
+  try { return await action(); } finally {
+    await cartBar(page).locator('.scroll-down').click(); // The arrow again: back to the bar with TOTAL.
+    await expect(cartBar(page).locator('.booked-collapsed')).toBeVisible();
+  }
+}
+
+/** How many of an item are in the cart (0 while nothing is added). */
 export async function foodCount(item: Locator) {
-  const added = item.locator('.food-added-count'); // e.g. "1 item added" (since the 8 Oct 2026 deployment).
+  const added = item.locator('.food-added-count'); // UAT: "1 item added" under the Add button (since the 8 Oct 2026 deployment).
   if (await added.count()) return Number((await added.innerText()).match(/\d+/)?.[0] ?? 0);
-  const count = item.locator('#ticket-count'); // The older "- n +" box (before 8 Oct 2026).
-  return await count.count() ? Number(await count.getAttribute('placeholder')) : 0;
+  const count = item.locator('#ticket-count'); // The older "- n +" box on the card (before 8 Oct 2026).
+  if (await count.count()) return Number(await count.getAttribute('placeholder'));
+  const page = item.page(); // Pre-UAT: the booking bar's cart.
+  const name = await itemName(item);
+  const chip = cartBar(page).locator('.combos-foods .food-quantity-name b').filter({ hasText: exactly(name) }); // "<name> Added".
+  if (!await chip.count()) return 0; // Not in the cart.
+  return inOpenCart(page, async () => Number(await cartLine(page, name).locator('#ticket-count').getAttribute('placeholder')));
 }
 
 /**
@@ -73,9 +100,26 @@ export async function addFood(page: Page, item: Locator, quantity = 1) {
   await expect.poll(() => foodCount(item), { message: `The item should be in the cart ${before + quantity} time(s)` }).toBe(before + quantity);
 }
 
-/** The way to take an item out of the cart, if the food page has one ("-" or a remove button). */
-export const removeFoodControl = (page: Page, item: Locator) => item.locator('.counter-button button').first()
-  .or(page.locator('.booked-info-fixed').getByRole('button', { name: /remove|delete/i })).filter({ visible: true });
+/**
+ * Takes an item out of the cart, if the food page offers a way: "-" on the item's card (before 8 Oct 2026) or Remove in
+ * the booking bar's cart (Pre-UAT, 14 Oct 2026). Returns false when there is no way (UAT since 8 Oct 2026).
+ */
+export async function removeFood(page: Page, item: Locator) {
+  const minus = item.locator('.counter-button button').first().filter({ visible: true }); // "-" on the card.
+  if (await minus.count()) {
+    while (await foodCount(item) > 0) await minus.click(); // Down to 0.
+    return true;
+  }
+  const name = await itemName(item);
+  if (!await cartBar(page).locator('.scroll-up').count()) return false; // No cart to open.
+  return inOpenCart(page, async () => {
+    const remove = cartLine(page, name).locator('.food-remove-btn a'); // Remove.
+    if (!await remove.count()) return false;
+    await remove.click();
+    await expect(cartLine(page, name)).toHaveCount(0); // The line is gone.
+    return true;
+  });
+}
 
 /** Clicks Proceed on the food page and waits for the payment page. */
 export async function proceedFromFood(page: Page) {

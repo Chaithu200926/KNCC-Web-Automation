@@ -65,6 +65,32 @@ export async function openSignUp(page: Page) {
   await expect(signUpDialog(page)).toBeVisible(); // The SIGN UP form.
 }
 
+/**
+ * Chooses a Date of Birth (DD-MM-YYYY) in the date picker of a box.
+ * Pre-UAT (14 Oct 2026): a typed date is ignored; the calendar opens on the latest allowed month (10 years ago) and has
+ * a year list (a few years at a time, its last entry shows earlier years) and a month list; in My Account > PROFILE the
+ * month and year are drop-down boxes. The sign-up box then shows YYYY-MM-DD.
+ */
+export async function pickDateOfBirth(page: Page, box: Locator, date: string) {
+  const [day, month, year] = date.split('-').map(Number); // e.g. 1, 1, 1995.
+  await box.click(); // Opens the calendar.
+  const calendar = page.locator('.react-datepicker').filter({ visible: true }).first();
+  const selects = calendar.locator('select'); // My Account > PROFILE: month and year are drop-down boxes.
+  if (await selects.count() >= 2) {
+    await calendar.locator('select.react-datepicker__year-select, select').last().selectOption(String(year)); // The year.
+    await calendar.locator('select.react-datepicker__month-select, select').first().selectOption({ index: month - 1 }); // The month.
+  } else { // SIGN UP: scrolling year and month lists.
+    await calendar.locator('.react-datepicker__year-read-view').click(); // The year list.
+    const years = calendar.locator('.react-datepicker__year-option');
+    const wanted = years.filter({ hasText: new RegExp(`^\\D*${year}$`) });
+    for (let i = 0; i < 40 && !await wanted.count(); i += 1) await years.last().click(); // Earlier years.
+    await wanted.click(); // The year.
+    await calendar.locator('.react-datepicker__month-read-view').click(); // The month list.
+    await calendar.locator('.react-datepicker__month-option').nth(month - 1).click(); // The month.
+  }
+  await calendar.locator(`.react-datepicker__day--${String(day).padStart(3, '0')}:not(.react-datepicker__day--outside-month)`).click(); // The day: the calendar closes.
+}
+
 /** Fills the SIGN UP form with a new user's details (the promotion options keep their default "Yes"). */
 export async function fillSignUp(page: Page, user: NewUser) {
   const form = signUpDialog(page);
@@ -75,8 +101,7 @@ export async function fillSignUp(page: Page, user: NewUser) {
   await form.locator('input[name="con-password"]').fill(user.password); // Confirm Password.
   await form.locator('input[name="mobile"]').fill(user.mobile); // Mobile (+965 is preselected).
   const dateOfBirth = form.locator('.react-datepicker__input-container input'); // Date of Birth (a date picker).
-  await dateOfBirth.fill(user.dateOfBirth); // Typed as DD-MM-YYYY; the calendar opens on that day.
-  await form.locator('.react-datepicker__day--selected').click(); // Click the highlighted day: the calendar closes.
+  await pickDateOfBirth(page, dateOfBirth, user.dateOfBirth); // Year, month and day in the calendar.
   await expect(dateOfBirth).toHaveValue(user.dateOfBirth.split('-').reverse().join('-')); // e.g. "1995-01-01".
   const gender = form.locator('label').filter({ hasText: new RegExp(`^${user.gender}$`) }); // Gender (radio inside its label).
   await gender.click();

@@ -10,7 +10,7 @@ import { // Booking steps (see pages/Booking.ts):
   reopenSeatMap, selectAvailableSeats, signInAndReopenShow, skipFood, type Show,
 } from './pages/Booking';
 import { // Food page steps (see pages/Food.ts):
-  addFood, foodCategories, foodCount, foodItems, foodPageTotal, foodPrice, openedFoodPage, proceedFromFood, removeFoodControl,
+  addFood, foodCategories, foodCount, foodItems, foodPageTotal, foodPrice, openedFoodPage, proceedFromFood, removeFood,
 } from './pages/Food';
 
 test.describe.configure({ timeout: 300_000 }); // Up to 5 minutes (sign-in and two bookings on the slow UAT site).
@@ -69,9 +69,8 @@ test("WEB-26 Food for today's show: add, change, remove, skip", async ({ page, s
   await step('Look for a way to remove the item on the food page (noted when there is none)', async () => {
     // The food page has no "-" or remove since the 8 Oct 2026 deployment; that is noted, not failed. The food is
     // left out instead with Cancel and SKIP & PROCEED (last steps).
-    const control = removeFoodControl(page, item);
-    if (!notOnUat(await control.count() > 0, 'The food page has no way to take an added item out of the cart ("-" or remove).')) return;
-    while (await foodCount(item) > 0 && await control.count()) await control.first().click(); // Take it all out.
+    // Pre-UAT (14 Oct 2026): Remove in the booking bar's cart (the arrow above the bar).
+    if (!notOnUat(await removeFood(page, item), 'The food page has no way to take an added item out of the cart ("-" or remove).')) return;
     await expect.poll(() => foodCount(item), { message: 'The item should be out of the cart' }).toBe(0);
     await expectTotal(0, 'After removing the item');
     await addFood(page, item, 2); // Back to 2 for the next step.
