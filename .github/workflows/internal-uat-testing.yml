@@ -1,0 +1,135 @@
+# Internal UAT Testing: runs the website test cases WEB-01..WEB-48 against the internal UAT website
+# (http://10.35.1.66:8103, specs in Test1/tests-uat) and/or the internal Pre-UAT website (http://10.35.1.66:8123,
+# specs in Test1/tests-pre-uat), one test at a time, each in a new incognito browser context.
+#
+# The internal websites are on the office network only, so GitHub's own runners cannot reach them: this workflow
+# runs on the QA PC through a self-hosted runner with the label "web-uat" (started with run.cmd from its own
+# folder, e.g. C:\actions-runner-web, in the logged-in session of the QA PC).
+#
+# Start it by hand from the Actions tab ("Run workflow"). Results:
+#   * a results table on the run page (job summary), one per website,
+#   * the dashboard, Playwright HTML report and raw results as a downloadable artifact (kept 14 days),
+#   * the UAT and Pre-UAT checklist on the QA PC (C:\softwares\KNCC testing\Cinescape UAT and Pre-UAT Checklist.html),
+#   * the run goes red when any test failed.
+# The public GitHub Pages dashboard of "CINESCAPE WEB Testing" is not touched.
+name: Internal UAT Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      site:
+        description: Website to test
+        type: choice
+        options: [uat, pre-uat, both]
+        default: uat
+      tests:
+        description: Only these cases (e.g. "WEB-07 WEB-25"); empty = all WEB-01..48
+        type: string
+        default: ''
+
+# Only reads the code; reports go to the run page and the artifact.
+permissions:
+  contents: read
+
+# Same group as the other website workflows: the tests book with the same accounts,
+# so runs wait for each other instead of running at the same time.
+concurrency:
+  group: cinescape-uat-tests
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Run the web tests on the internal ${{ inputs.site }} website (QA PC)
+    runs-on: [self-hosted, windows, web-uat]
+    # A full run of one website takes about 45-50 minutes; "both" runs UAT, then Pre-UAT.
+    timeout-minutes: 150
+    # All commands run in Windows PowerShell inside the Playwright project folder.
+    defaults:
+      run:
+        shell: powershell
+        working-directory: Test1
+    env:
+      # The QA PC's own checklist and its merged results (kept outside the runner's work folder,
+      # which is a fresh checkout on every run).
+      CHECKLIST_FILE: C:\softwares\KNCC testing\Cinescape UAT and Pre-UAT Checklist.html
+      CHECKLIST_STATE: C:\softwares\vs code\playwright\Test1\site-checklist\state.json
+    steps:
+      # Get the code.
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # Stop early with a clear message when the QA PC is not on the office network.
+      - name: Check the internal websites can be reached
+        env:
+          SITE: ${{ inputs.site }}
+        run: |
+          $urls = @{ 'uat' = 'http://10.35.1.66:8103'; 'pre-uat' = 'http://10.35.1.66:8123' }
+          $names = if ($env:SITE -eq 'both') { @('uat', 'pre-uat') } else { @($env:SITE) }
+          foreach ($name in $names) {
+            try { $null = Invoke-WebRequest -Uri $urls[$name] -UseBasicParsing -TimeoutSec 20; Write-Host "$name website OK: $($urls[$name])" }
+            catch { throw "Cannot reach the $name website $($urls[$name]) (office network / VPN needed)." }
+          }
+
+      # Install the exact package versions from package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Make sure Chromium is installed for this Playwright version (already there after the first run).
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      # The test accounts, OTP, KNET and gift card details are never in the repo: use the QA PC's own .env file
+      # (repository variable WEB_UAT_ENV_FILE, or the project folder on the QA PC).
+      - name: Use the QA PC's test settings
+        run: Copy-Item -LiteralPath "${{ vars.WEB_UAT_ENV_FILE || 'C:\softwares\vs code\playwright\Test1\.env' }}" -Destination .env
+
+      # Run the tests with scripts/run-site.ps1 (the same script as a local run): it builds each website's dashboard
+      # and updates the checklist. Failed tests do not stop the job; the last step marks the run red instead.
+      # The chosen cases come in through an environment variable and only "WEB-nn" IDs are used,
+      # so a typed value cannot run anything else.
+      - name: Run the tests
+        env:
+          SITE: ${{ inputs.site }}
+          TESTS: ${{ inputs.tests }}
+        run: |
+          $ids = @([regex]::Matches("$env:TESTS", '(?i)WEB-\d{2}') | ForEach-Object { $_.Value.ToLower() } | Select-Object -Unique)
+          $filter = if ($ids.Count -gt 0) { $ids -join ',' } else { '' }
+          if ($filter) { Write-Host "Only: $filter" }
+          powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site $env:SITE -NoOpen -Checklist $env:CHECKLIST_FILE -Tests $filter
+          exit 0 # Failed tests are counted by the last step.
+
+      # Keep each website's dashboard (with its Playwright report), HTML report and raw results downloadable.
+      # The Playwright report and traces record typed values (password, OTP, card details): artifact only, never Pages.
+      - name: Upload reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: internal-${{ inputs.site }}-reports
+          path: |
+            Test1/dashboard-uat/
+            Test1/dashboard-pre-uat/
+            Test1/playwright-report-uat/
+            Test1/playwright-report-pre-uat/
+            Test1/test-results-uat/
+            Test1/test-results-pre-uat/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Mark the run red if any test failed (after all reports are saved).
+      - name: Fail the run if any test failed
+        if: always()
+        run: |
+          $failed = 0
+          foreach ($file in @('test-results-uat/results.json', 'test-results-pre-uat/results.json')) {
+            if (Test-Path $file) {
+              $stats = (Get-Content $file -Raw | ConvertFrom-Json).stats
+              Write-Host "$file : $($stats.expected) passed, $($stats.unexpected) failed, $($stats.flaky) flaky, $($stats.skipped) skipped"
+              $failed += $stats.unexpected
+            }
+          }
+          if ($failed -gt 0) { Write-Host "::error::$failed test(s) failed. See the summary above or the dashboards in the artifact."; exit 1 }
+
+      # Never leave the .env copy in the runner's work folder.
+      - name: Remove the settings copy
+        if: always()
+        run: Remove-Item .env -ErrorAction SilentlyContinue

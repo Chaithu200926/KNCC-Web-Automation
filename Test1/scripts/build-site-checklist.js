@@ -5,11 +5,13 @@
 //   node scripts/build-site-checklist.js [--add uat|pre-uat] [--out "<file.html>"]
 //     --add <site>  merge test-results-<site>/results.json into the state first (run-site.ps1 does this after a run)
 //     --out <file>  where to write the checklist (default: site-checklist/Cinescape UAT and Pre-UAT Checklist.html)
+//   CHECKLIST_STATE=<file> keeps the merged results somewhere else (the "Internal UAT Testing" workflow uses the QA PC's
+//   own copy, because every workflow run starts from a fresh checkout).
 const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const stateFile = path.join(root, 'site-checklist', 'state.json');
+const stateFile = process.env.CHECKLIST_STATE ? path.resolve(process.env.CHECKLIST_STATE) : path.join(root, 'site-checklist', 'state.json');
 const SITES = [
   { id: 'uat', label: 'UAT', url: 'http://10.35.1.66:8103', specs: 'tests-uat' },
   { id: 'pre-uat', label: 'Pre-UAT', url: 'http://10.35.1.66:8123', specs: 'tests-pre-uat' },

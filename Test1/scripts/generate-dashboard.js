@@ -237,7 +237,7 @@ const run = {
   author: process.env.GITHUB_ACTOR || git('log -1 --pretty=%an'),
   branch: process.env.GITHUB_REF_NAME || git('branch --show-current'),
   trigger: process.env.GITHUB_EVENT_NAME || 'local run',
-  machine: process.env.GITHUB_ACTIONS ? `GitHub-hosted runner (${process.env.RUNNER_OS || os.type()})` : 'Local PC',
+  machine: process.env.GITHUB_ACTIONS ? `${process.env.RUNNER_ENVIRONMENT === 'self-hosted' ? 'Self-hosted runner on the QA PC' : 'GitHub-hosted runner'} (${process.env.RUNNER_OS || os.type()})` : 'Local PC',
   os: `${os.type()} ${os.release()}`,
   node: process.version,
   playwright: pkgVersion('@playwright/test'),
