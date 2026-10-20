@@ -125,7 +125,9 @@ export async function expectTicketMatchesChoice(view: Locator, choice: TicketCho
   const text = flatText(await view.innerText());
   expect.soft(text, `${where}: movie title`).toMatch(choice.title);
   expect.soft(text, `${where}: language ${choice.language}`).toMatch(new RegExp(`\\b${escapeRegExp(choice.language)}\\b`, 'i'));
-  expect.soft(text, `${where}: location ${choice.location}`).toMatch(new RegExp(`Location\\s*${escapeRegExp(choice.location)}`, 'i'));
+  // Pre-UAT (since 19 Oct 2026) names the cinema "Cinescapee 360", so the extra "e" is optional.
+  const location = escapeRegExp(choice.location).replace(/^Cinescape\b/i, 'Cinescapee?');
+  expect.soft(text, `${where}: location ${choice.location}`).toMatch(new RegExp(`Location\\s*${location}`, 'i'));
   expect.soft(text, `${where}: date and time`).toMatch(
     new RegExp(`\\b0?${Number(choice.day)}\\s+[A-Za-z]{3,9}\\s+\\d{4}\\s*\\|\\s*${escapeRegExp(choice.time)}\\b`));
   expect.soft(text, `${where}: seat ${choice.seat}`).toMatch(new RegExp(`\\bSeats?\\s*${escapeRegExp(choice.seat)}\\b`));

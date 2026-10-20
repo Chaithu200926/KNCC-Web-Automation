@@ -12,13 +12,13 @@ test('WEB-40 Cinema location map links', async ({ page, step, testConfig }, test
   let popupPlace: string | undefined; // Coordinates shown by the Locations page map.
   // The Cinescape 360 card. Since the 8 Oct 2026 deployment the Locations page also lists Cinescape Ajial and Avenues,
   // in a changing order (Ajial has no data on UAT yet), so the card is found by its name, not by position.
-  const card = page.locator('.cinescap_location').filter({ has: page.locator('h3').filter({ hasText: /^\s*cinescape 360\s*$/i }) }).first();
+  const card = page.locator('.cinescap_location').filter({ has: page.locator('h3').filter({ hasText: /^\s*cinescapee? 360\s*$/i }) }).first();
 
   await step('Open the footer LOCATIONS link and check the cinema is listed', async () => {
     await openHome(page, testConfig.urls.home); // Load the homepage.
     await page.locator('footer:not(.footer-mobile):visible a').filter({ hasText: /^locations$/i }).first().click(); // Footer LOCATIONS.
     await expect(page).toHaveURL(/\/locations$/); // Locations page.
-    await expect(page.getByText(/^cinescape 360$/i).first()).toBeVisible({ timeout: 60_000 }); // Cinescape 360 is listed.
+    await expect(page.getByText(/^cinescapee? 360$/i).first()).toBeVisible({ timeout: 60_000 }); // Cinescape 360 is listed.
     const address = async () => (await card.locator('.location_info').first().innerText()).replace(/\b(?:location|maps)\b/gi, '').trim(); // Text under LOCATION.
     // The Locations list shows no address under LOCATION on UAT (30 Sep - 8 Oct 2026); the cinema page has it (checked below).
     notOnUat(await expect.poll(address, { timeout: 20_000 }).not.toBe('').then(() => true, () => false), // Given 20 s to load.

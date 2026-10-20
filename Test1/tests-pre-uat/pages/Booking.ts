@@ -64,7 +64,7 @@ export type ShowDate = 'today' | 'tomorrow' | 'monday' | 'tuesday';
 export async function chooseShowOfMovie(page: Page, baseUrl: string, href: string, date: ShowDate, minHoursAhead = 3): Promise<Show | undefined> {
   await page.goto(new URL(href, baseUrl).toString(), { waitUntil: 'commit' }); // Open the movie page.
   await expect(dateTabs(page).nth(1)).toBeVisible({ timeout: 60_000 }); // Wait for the date tabs.
-  await page.locator('#cinema0000000001, .cinemacarousal').filter({ hasText: /Cinescape 360/i }).first().click(); // Cinescape 360.
+  await page.locator('#cinema0000000001, .cinemacarousal').filter({ hasText: /Cinescapee? 360/i }).first().click(); // Cinescape 360.
   let tab: Locator; // The date tab to use.
   if (date === 'today') {
     if (!/today/i.test(await dateTabs(page).first().innerText())) return undefined; // No show today for this movie.
@@ -271,7 +271,7 @@ export async function closeOpenMessage(page: Page) {
 export async function reopenSeatMap(page: Page, baseUrl: string, show: Show, tickets = 1) {
   await page.goto(new URL(show.href, baseUrl).toString(), { waitUntil: 'commit' }); // Movie page.
   await expect(dateTabs(page).nth(1)).toBeVisible({ timeout: 60_000 }); // Date tabs.
-  await page.locator('#cinema0000000001, .cinemacarousal').filter({ hasText: /Cinescape 360/i }).first().click(); // Cinescape 360.
+  await page.locator('#cinema0000000001, .cinemacarousal').filter({ hasText: /Cinescapee? 360/i }).first().click(); // Cinescape 360.
   const tab = dateTab(page, show.day); // Same date tab.
   await tab.click();
   await expect(tab).toHaveAttribute('aria-selected', 'true');
@@ -288,7 +288,7 @@ export async function reopenSeatMap(page: Page, baseUrl: string, show: Show, tic
 export async function clickShowSignedOut(page: Page, baseUrl: string, show: Show) {
   await page.goto(new URL(show.href, baseUrl).toString(), { waitUntil: 'commit' }); // Movie page.
   await expect(dateTabs(page).nth(1)).toBeVisible({ timeout: 60_000 }); // Date tabs.
-  await page.locator('#cinema0000000001, .cinemacarousal').filter({ hasText: /Cinescape 360/i }).first().click(); // Cinescape 360.
+  await page.locator('#cinema0000000001, .cinemacarousal').filter({ hasText: /Cinescapee? 360/i }).first().click(); // Cinescape 360.
   const tab = dateTab(page, show.day); // The show's date.
   await tab.click();
   await expect(tab).toHaveAttribute('aria-selected', 'true');

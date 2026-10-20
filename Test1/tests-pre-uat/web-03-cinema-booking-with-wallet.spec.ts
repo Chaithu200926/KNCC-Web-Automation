@@ -133,7 +133,7 @@ test('WEB-03 Cinema booking with wallet, confirmed and cancelled in My Profile',
 
   await test.step('Choose tomorrow and a showtime on that calendar day', async () => {
     // The "Cinescape 360" cinema block on the sessions page.
-    const experience = page.locator('#cinema0000000001, .cinemacarousal:visible').filter({ hasText: /Cinescape 360/i }).first(); // Cinescape 360 block.
+    const experience = page.locator('#cinema0000000001, .cinemacarousal:visible').filter({ hasText: /Cinescapee? 360/i }).first(); // Cinescape 360 block.
     await expect(experience).toBeVisible(); // Wait for it.
     await clickWithHighlight('02-experience', experience, 'STEP 2 - CHOOSE CINESCAPE 360 EXPERIENCE'); // Select it.
 

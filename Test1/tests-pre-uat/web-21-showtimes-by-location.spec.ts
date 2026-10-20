@@ -15,11 +15,11 @@ test('WEB-21 Showtimes by location', async ({ page, step, testConfig }) => {
   await step('Open CINESCAPE LOCATIONS > Cinescape 360 from the homepage', async () => {
     await openHome(page, testConfig.urls.home); // Load the homepage.
     // Found by its name: since the 8 Oct 2026 deployment Cinescape Ajial and Avenues are listed too, in a changing order.
-    await page.locator('section.location-section .location-preview').filter({ hasText: /cinescape 360/i }).first()
+    await page.locator('section.location-section .location-preview').filter({ hasText: /cinescapee? 360/i }).first()
       .locator('a[href*="/cinemasessions/"]').first() // The Cinescape 360 link
       .evaluate((link) => (link as HTMLAnchorElement).click()); // clicked directly.
     await page.waitForURL(/\/cinemasessions\//, { timeout: 60_000 }); // The cinema page opens.
-    await expect(page.getByText(/^cinescape 360$/i).first()).toBeVisible({ timeout: 60_000 }); // Its name is shown.
+    await expect(page.getByText(/^cinescapee? 360$/i).first()).toBeVisible({ timeout: 60_000 }); // Its name is shown.
   });
 
   await step("Check the cinema page lists today's movies with showtimes", async () => {
@@ -41,7 +41,7 @@ test('WEB-21 Showtimes by location', async ({ page, step, testConfig }) => {
     await openHome(page, testConfig.urls.home); // Back to the homepage.
     const href = (await bannerMovies(page))[0].bookNow; // First banner movie.
     await page.goto(new URL(href, testConfig.urls.home).toString(), { waitUntil: 'commit' }); // Open its page.
-    await expect(page.locator('.cinemacarousal').filter({ hasText: /cinescape 360/i }).first()).toBeVisible({ timeout: 60_000 }); // Cinema bar.
+    await expect(page.locator('.cinemacarousal').filter({ hasText: /cinescapee? 360/i }).first()).toBeVisible({ timeout: 60_000 }); // Cinema bar.
     await expect(page.locator('.time-box:visible').first()).toBeVisible({ timeout: 30_000 }); // Its showtimes.
   });
 });

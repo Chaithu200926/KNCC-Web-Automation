@@ -35,7 +35,7 @@ test('WEB-37 Preferences', async ({ page, step, testConfig }) => {
     for (const heading of ['LOCATION', 'SEAT CATEGORY', 'SEAT TYPE', 'EXPERIENCE', 'AGE RATING', 'NOTIFICATIONS']) {
       await expect.soft(prefs, `PREFERENCES should show ${heading}`).toContainText(new RegExp(heading, 'i')); // Each section.
     }
-    await expect(prefs.locator('select').first()).toContainText(/cinescape 360/i); // Location list offers Cinescape 360.
+    await expect(prefs.locator('select').first()).toContainText(/cinescapee? 360/i); // Location list offers Cinescape 360.
     for (const option of ['Family', 'Bachelor', 'Standard', 'Premium', 'G', 'PG', '13+', '18+']) {
       await expect.soft(prefs.getByText(option, { exact: true }).first(), `PREFERENCES should offer "${option}"`).toBeVisible(); // Each option.
     }
