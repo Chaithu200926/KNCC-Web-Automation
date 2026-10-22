@@ -14,6 +14,7 @@
     dashboard-<site>\index.html            Dashboard (summary, steps, screenshots, videos)
     Cinescape UAT and Pre-UAT Checklist.html  WEB-01..48 on both sites (C:\softwares\KNCC testing, -Checklist to change)
     test-results-<site>\                   Raw files: results.json, results.xml, test-execution.log.txt, videos, screenshots
+    C:\softwares\KNCC testing\<d Mon> reports\  RCA of the run alone + comparison RCA (scripts/build-site-rca.py)
 #>
 param(
   [ValidateSet('uat', 'pre-uat', 'pre-prod', 'both')] [string] $Site = 'both',
@@ -58,6 +59,10 @@ foreach ($name in $toRun) {
 
   # This run's results into the UAT / Pre-UAT checklist (cases not in this run keep their last result).
   if ($name -ne 'pre-prod' -and (Test-Path "test-results-$name/results.json")) { node scripts/build-site-checklist.js --add $name --out $Checklist }
+
+  # RCA workbooks of this run (this run alone, and compared with the last reviewed UAT vs Pre-UAT RCA) in
+  # C:\softwares\KNCC testing\<d Mon> reports. Needs Python with openpyxl.
+  if (Test-Path "test-results-$name/results.json") { python scripts/build-site-rca.py $name }
 
   $minutes = [math]::Round(((Get-Date) - $started).TotalMinutes, 1)
   Write-Host "$name finished in $minutes min (exit code $exitCode)." -ForegroundColor Cyan
