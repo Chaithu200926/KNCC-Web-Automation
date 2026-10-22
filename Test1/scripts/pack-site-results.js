@@ -24,7 +24,9 @@ const visitSuite = (suite) => {
   for (const spec of suite.specs || []) for (const test of spec.tests || []) for (const result of test.results || []) {
     result.attachments = (result.attachments || []).filter((a) => a.body || keep(a)).map((a) => {
       if (a.body) return a.contentType === 'image/png' ? a : null; // Inline screenshots stay; other inline data is dropped.
-      const relative = path.relative(root, a.path).split(path.sep).join('/'); // test-results-<site>/<test folder>/<file>
+      // Short names (test-results-<site>/files/<n>.<ext>): Playwright's folder and attachment names are too long for
+      // Windows paths once inside another folder.
+      const relative = `${resultsDir}/files/${files + 1}${path.extname(a.path)}`;
       fs.mkdirSync(path.dirname(path.join(out, relative)), { recursive: true });
       fs.copyFileSync(a.path, path.join(out, relative));
       files++;
