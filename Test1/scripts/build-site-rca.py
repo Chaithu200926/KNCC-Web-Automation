@@ -14,7 +14,10 @@ Issue type and reason are a first guess from the failure (please review them; th
   Environment issue  the website or the payment gateway could not be reached,
   To be checked      anything else.
 
-  python scripts/build-site-rca.py pre-prod [--out-dir "<folder>"] [--cases "<test cases workbook>"]
+With --final it builds "Cinescape <Site> Final RCA - <date>.xlsx" (and the Final comparison) from the day's
+"RCA (Run N)" workbooks instead: each case with its result from the latest run that ran it, hand corrections kept.
+
+  python scripts/build-site-rca.py pre-prod [--final] [--out-dir "<folder>"] [--cases "<test cases workbook>"]
     --out-dir  default: C:\\softwares\\KNCC testing\\<d Mon> reports (the run number goes up per site and day)
     --cases    workbook with the Web sheet (Test ID, Module, Test case, Test steps, Expected result); default: the
                newest "*All Test Cases*.xlsx" under C:\\softwares\\KNCC testing. Without it the steps come from the run.
@@ -47,14 +50,18 @@ parser.add_argument('site', choices=SITES)
 parser.add_argument('--out-dir')
 parser.add_argument('--cases')
 parser.add_argument('--baseline')
+parser.add_argument('--final', action='store_true',
+                    help="merge today's 'RCA (Run N)' workbooks of the site: every case with its latest result")
 args = parser.parse_args()
 label, url = SITES[args.site]
 
-results_file = os.path.join(ROOT, f'test-results-{args.site}', 'results.json')
-if not os.path.exists(results_file):
-    sys.exit(f'No test-results-{args.site}/results.json - run the tests first.')
-with open(results_file, encoding='utf8') as f:
-    results = json.load(f)
+results = {}
+if not args.final:
+    results_file = os.path.join(ROOT, f'test-results-{args.site}', 'results.json')
+    if not os.path.exists(results_file):
+        sys.exit(f'No test-results-{args.site}/results.json - run the tests first.')
+    with open(results_file, encoding='utf8') as f:
+        results = json.load(f)
 
 
 # ---------- the run's results, one entry per WEB case ----------
@@ -129,7 +136,7 @@ def walk(suite):
 
 for suite in results.get('suites', []):
     walk(suite)
-if not cases:
+if not cases and not args.final:
     sys.exit('No WEB cases in the results.')
 
 # ---------- descriptions and steps from the test cases workbook (optional) ----------
@@ -160,9 +167,39 @@ date_text = f'{run_day.day} {run_day:%b %Y}'
 out_dir = args.out_dir or os.path.join(TESTING, f'{run_day.day} {run_day:%b} reports')
 os.makedirs(out_dir, exist_ok=True)
 pattern = re.compile(rf'Cinescape {re.escape(label)} RCA \(Run (\d+)\) - {re.escape(date_text)}\.xlsx$')
-run_no = 1 + max([int(m.group(1)) for m in (pattern.match(n) for n in os.listdir(out_dir)) if m] or [0])
-out_file = os.path.join(out_dir, f'Cinescape {label} RCA (Run {run_no}) - {date_text}.xlsx')
+run_files = {int(m.group(1)): os.path.join(out_dir, m.group(0)) for m in (pattern.match(n) for n in os.listdir(out_dir)) if m}
 dashboard = os.path.join(ROOT, f'dashboard-{args.site}', 'index.html')
+if not args.final:
+    run_no = 1 + max(run_files or [0])
+    run_name = f'Run {run_no}'
+    out_file = os.path.join(out_dir, f'Cinescape {label} RCA ({run_name}) - {date_text}.xlsx')
+else:
+    # Final RCA: every case with its result from the latest of today's runs that ran it (a rerun of a few cases
+    # replaces only those). Issue types and reasons are taken as they are in those workbooks, with any hand corrections.
+    if not run_files:
+        sys.exit(f'No "Cinescape {label} RCA (Run N) - {date_text}.xlsx" in {out_dir}.')
+    latest_run = max(run_files)
+    for number in sorted(run_files):
+        rows = list(load_workbook(run_files[number], read_only=True, data_only=True)['All test cases'].iter_rows(values_only=True))
+        head = next(r for r in rows if r and r[0] == 'Test ID')
+        for r in rows:
+            if not (r and isinstance(r[0], str) and r[0].startswith('WEB-')):
+                continue
+            v = dict(zip(head, r))
+            cases[r[0]] = {
+                'id': r[0], 'title': v.get('Test case') or '', 'run': number,
+                'anchor': None,  # The dashboard shows only the latest run, so no link for older results.
+                'result': v.get(f'{label} result') or 'Not run', 'steps': [], 'duration': v.get('Duration (s)'),
+                'issue': v.get(f'{label} issue type') or '', 'reason': v.get(f'{label} reason') or '',
+                'step': v.get('Failed at step') or '', 'remarks': f'[Run {number}] ' + (v.get('Remarks') or ''),
+            }
+    # Links into the dashboard for the cases of the latest run (same order as that run's report).
+    order = [i for i in sorted(cases, key=lambda i: int(i.split('-')[1])) if cases[i]['run'] == latest_run]
+    for anchor, case_id in enumerate(order, start=1):
+        cases[case_id]['anchor'] = anchor
+    run_no = latest_run
+    run_name = f'Final (Runs {", ".join(map(str, sorted(run_files)))})'
+    out_file = os.path.join(out_dir, f'Cinescape {label} Final RCA - {date_text}.xlsx')
 
 # ---------- workbook ----------
 BOLD, TITLE, GREY = Font(bold=True), Font(bold=True, size=13), Font(color='FF595959')
@@ -185,6 +222,7 @@ def header_row(ws, row, titles, widths):
 
 
 ids = sorted(cases, key=lambda i: int(i.split('-')[1]))
+linked = lambda c: bool(c and c.get('anchor') and os.path.exists(dashboard))  # A link to the test in the dashboard.
 wb = Workbook()
 
 # Sheet 2 first (sheet 1's formulas point at it).
@@ -193,17 +231,17 @@ allc.title = 'All test cases'
 cols = ['Test ID', 'Module', 'Test case', 'Description (expected result)', 'Test steps', f'{label} result',
         f'{label} issue type', f'{label} reason', 'Failed at step', 'Remarks', 'Duration (s)', 'Evidence']
 header_row(allc, 3, cols, [9, 16, 30, 40, 55, 11, 18, 34, 34, 60, 10, 14])
-allc.cell(1, 1, f'All test cases - {label} website, Run {run_no} ({date_text})').font = TITLE
+allc.cell(1, 1, f'All test cases - {label} website, {run_name} ({date_text})').font = TITLE
 allc.cell(2, 1, f'{label}: {url}    Issue type and reason are a first guess from the failure - please review.').font = GREY
 for row, case_id in enumerate(ids, start=4):
     c, info = cases[case_id], sheet_info.get(case_id, {})
     steps = info.get('Test steps') or '\n'.join(f'{n}. {s}' for n, s in enumerate(c['steps'], start=1))
     values = [case_id, info.get('Module') or '', info.get('Test case') or c['title'], info.get('Expected result') or '',
               steps, c['result'], c['issue'] or None, c['reason'] or None, c['step'] or None, c['remarks'] or None,
-              c['duration'], 'Dashboard' if os.path.exists(dashboard) else None]
+              c['duration'], 'Dashboard' if linked(c) else None]
     for col, value in enumerate(values, start=1):
         allc.cell(row, col, value).alignment = WRAP
-    if os.path.exists(dashboard):
+    if linked(c):
         allc.cell(row, 12).hyperlink = f'file:///{dashboard.replace(os.sep, "/")}#test-{c["anchor"]}'
         allc.cell(row, 12).font = Font(color='FF0563C1', underline='single')
 last = 3 + len(ids)
@@ -219,9 +257,9 @@ colour(allc, f'G4:G{last}', ISSUE_TYPES)
 summary = wb.create_sheet('RCA Report', 0)
 summary.column_dimensions['A'].width, summary.column_dimensions['B'].width = 34, 14
 rng = lambda col: f"'All test cases'!${col}$4:${col}${last}"
-summary.cell(1, 1, f'Cinescape website - RCA report ({label}) - Run {run_no}').font = TITLE
+summary.cell(1, 1, f'Cinescape website - RCA report ({label}) - {run_name}').font = TITLE
 notes = [
-    f'{label}: {url}    Run started {run_day:%d %b %Y %H:%M}, {len(ids)} cases, run on the QA PC.',
+    f'{label}: {url}    ' + (f'Latest result of each case from runs {", ".join(map(str, sorted(run_files)))} of {date_text} (Remarks start with the run).' if args.final else f'Run started {run_day:%d %b %Y %H:%M}, {len(ids)} cases, run on the QA PC.'),
     'Issue type: "Application issue" = the website needs a fix.  "Script issue" = the website changed and the test needs an update (e.g. Locator change).  "Environment issue" = site or gateway not reachable.',
     'Issue type and reason are filled automatically from the failure messages - please review them (drop-down on the sheet "All test cases").',
     'The full details of every test case are on the sheet "All test cases"; the failed cases with a manual check column are on "Failed cases".',
@@ -245,7 +283,7 @@ failed = wb.create_sheet('Failed cases')
 fcols = ['Test ID', 'Test case', f'{label} result', f'{label} issue type', f'{label} reason', 'Failed at step', 'Remarks',
          'Evidence', 'Manual check status', 'Manual check notes']
 header_row(failed, 3, fcols, [9, 30, 11, 18, 34, 34, 60, 14, 16, 40])
-failed.cell(1, 1, f'Failed cases - {label} website, Run {run_no} ({date_text})').font = TITLE
+failed.cell(1, 1, f'Failed cases - {label} website, {run_name} ({date_text})').font = TITLE
 failed.cell(2, 1, 'Manual check status: choose Passed or Failed after checking the case by hand.').font = GREY
 row = 3
 for case_id in ids:
@@ -254,10 +292,10 @@ for case_id in ids:
         continue
     row += 1
     values = [case_id, sheet_info.get(case_id, {}).get('Test case') or c['title'], c['result'], c['issue'], c['reason'],
-              c['step'] or None, c['remarks'], 'Dashboard' if os.path.exists(dashboard) else None, None, None]
+              c['step'] or None, c['remarks'], 'Dashboard' if linked(c) else None, None, None]
     for col, value in enumerate(values, start=1):
         failed.cell(row, col, value).alignment = WRAP
-    if os.path.exists(dashboard):
+    if linked(c):
         failed.cell(row, 8).hyperlink = f'file:///{dashboard.replace(os.sep, "/")}#test-{c["anchor"]}'
         failed.cell(row, 8).font = Font(color='FF0563C1', underline='single')
 if row == 3:
@@ -312,7 +350,7 @@ def change(mine, theirs):
 
 
 all_ids = sorted(set(ids) | set(baseline), key=lambda i: int(i.split('-')[1]))
-cmp_file = os.path.join(out_dir, f'Cinescape {label} vs {" and ".join(other_sites)} RCA (Run {run_no}) - {date_text}.xlsx')
+cmp_file = os.path.join(out_dir, f'Cinescape {label} vs {" and ".join(other_sites)} ' + ('Final RCA' if args.final else f'RCA ({run_name})') + f' - {date_text}.xlsx')
 cwb = Workbook()
 call = cwb.active
 call.title = 'All test cases'
@@ -324,7 +362,7 @@ for l in other_sites + [label]:
 heads += [f'{label} vs {compare_to}', f'{label} failed at step', f'{label} remarks', 'Evidence']
 widths += [16, 30, 60, 12]
 header_row(call, 3, heads, widths)
-call.cell(1, 1, f'All test cases - {" vs ".join(other_sites + [label])} ({label} Run {run_no}, {date_text})').font = TITLE
+call.cell(1, 1, f'All test cases - {" vs ".join(other_sites + [label])} ({label} {run_name}, {date_text})').font = TITLE
 call.cell(2, 1, f'{" and ".join(other_sites)}: from "{os.path.basename(baseline_file)}" ({base_when}, reviewed).  '
                 f'{label}: this run, issue type and reason guessed from the failure - please review.').font = GREY
 change_col = 3 + 3 * (len(other_sites) + 1)
@@ -336,10 +374,10 @@ for row, case_id in enumerate(all_ids, start=4):
     mine = c['result'] if c else 'Not run'
     values += [mine, c['issue'] if c else '', c['reason'] if c else '']
     values += [change(mine, baseline.get(case_id, {}).get(compare_to, ('Not run',))[0]) if compare_to else 'Not compared',
-               c['step'] if c else '', c['remarks'] if c else '', 'Dashboard' if c and os.path.exists(dashboard) else None]
+               c['step'] if c else '', c['remarks'] if c else '', 'Dashboard' if linked(c) else None]
     for col, value in enumerate(values, start=1):
         call.cell(row, col, value or None).alignment = WRAP
-    if c and os.path.exists(dashboard):
+    if linked(c):
         call.cell(row, len(values)).hyperlink = f'file:///{dashboard.replace(os.sep, "/")}#test-{c["anchor"]}'
         call.cell(row, len(values)).font = Font(color='FF0563C1', underline='single')
 clast = 3 + len(all_ids)
@@ -359,11 +397,11 @@ mine_issue.add(f'{letter(change_col - 2)}4:{letter(change_col - 2)}{clast}')
 # Summary sheet: counts per site and the changes against the compared site.
 csum = cwb.create_sheet('RCA Report', 0)
 csum.column_dimensions['A'].width = 34
-csum.cell(1, 1, f'Cinescape website - RCA comparison ({" vs ".join(other_sites + [label])}) - {label} Run {run_no}').font = TITLE
+csum.cell(1, 1, f'Cinescape website - RCA comparison ({" vs ".join(other_sites + [label])}) - {label} {run_name}').font = TITLE
 cnotes = [
     '    '.join(f'{l}: {SITES[k][1]}' for k, (l, _) in SITES.items() if l in other_sites + [label]),
     f'{" and ".join(other_sites)} results, issue types and reasons: {os.path.basename(baseline_file)} ({base_when}).',
-    f'{label}: this run ({run_day:%d %b %Y %H:%M}); issue type and reason are a first guess from the failure - please review.',
+    (f'{label}: latest result of each case from the runs of {date_text}' if args.final else f'{label}: this run ({run_day:%d %b %Y %H:%M})') + f'; issue type and reason are a first guess from the failure - please review.',
     f'"{label} vs {compare_to}": New failure = fails on {label} but passed on {compare_to}; Fixed = the other way round.',
 ]
 for row, note in enumerate(cnotes, start=2):

@@ -61,11 +61,18 @@ test('WEB-48 Live chat opens', async ({ page, step, testConfig }, testInfo) => {
     await chat.locator('textarea[name="message"]').pressSequentially('hi');
     await startChat.click(); // Start the conversation.
     await expect(chat.locator('input[name="emailAddress"]'), 'The form should close when the chat starts').toBeHidden({ timeout: 30_000 });
-    await expect(chat.getByText('hi', { exact: true }).first(), 'The conversation should show the sent "hi"').toBeVisible({ timeout: 30_000 });
+    // Pre-Prod (22 Oct 2026): the form's message starts the chat but is not shown as a bubble; the agent greets at once.
     await expect.poll(chatText, { message: 'The AI agent should greet the customer', timeout: 60_000 }).toMatch(/welcome|hello|how can i help/i);
-    testInfo.annotations.push({ type: 'agent reply', description: (await chatText()).replace(/^.*?\bhi\b/i, '').slice(0, 160) });
+    testInfo.annotations.push({ type: 'agent reply', description: (await chatText()).slice(0, 160) });
     for (const feedback of ['Thumbs up', 'Thumbs down']) {
       await expect.soft(chat.getByRole('button', { name: feedback }).first(), `The reply should offer "${feedback}" feedback`).toBeVisible();
     }
+  });
+
+  await step('Type "hi" in the chat box ("Ask me anything...") and check it shows in the conversation', async () => {
+    const box = chat.getByPlaceholder(/ask me anything/i).first(); // The chat's message box.
+    await box.pressSequentially('hi'); // Typed key by key, like a customer.
+    await box.press('Enter'); // Send.
+    await expect(chat.getByText('hi', { exact: true }).first(), 'The conversation should show the sent "hi"').toBeVisible({ timeout: 30_000 });
   });
 });

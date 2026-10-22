@@ -89,6 +89,11 @@ export async function completeSignIn(page: Page, account: Credentials) {
   await submitSignIn(page, account.username, account.password); // Email and password.
   await submitOtp(page, account.pin); // The email OTP.
   await expect(otpDialog(page)).toBeHidden({ timeout: 30_000 }); // The OTP dialog closes.
+  // Pre-Prod (22 Oct 2026, second test account, not every time): a "CONFIRM MOBILE NUMBER" dialog came up after the
+  // email OTP with an empty "An OTP is sent to" box, and the sign-in did not finish. Name it when it happens.
+  const confirmMobile = page.locator('[role="dialog"]:visible').filter({ hasText: /confirm mobile number/i }).last();
+  await expect(myAccountLink(page).or(confirmMobile).first()).toBeAttached({ timeout: 30_000 });
+  expect(await confirmMobile.isVisible(), 'Sign-in should finish after the email OTP, not stop at "CONFIRM MOBILE NUMBER" (no mobile number shown)').toBe(false);
   await expect(myAccountLink(page)).toBeAttached({ timeout: 30_000 }); // The header now links to My Account.
 }
 

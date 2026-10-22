@@ -62,7 +62,8 @@ foreach ($name in $toRun) {
 
   # RCA workbooks of this run (this run alone, and compared with the last reviewed UAT vs Pre-UAT RCA) in
   # C:\softwares\KNCC testing\<d Mon> reports. Needs Python with openpyxl.
-  if (Test-Path "test-results-$name/results.json") { python scripts/build-site-rca.py $name }
+  # Then the Final RCA of the day: every case with its latest result (a rerun of failed cases replaces only those).
+  if (Test-Path "test-results-$name/results.json") { python scripts/build-site-rca.py $name; python scripts/build-site-rca.py $name --final }
 
   $minutes = [math]::Round(((Get-Date) - $started).TotalMinutes, 1)
   Write-Host "$name finished in $minutes min (exit code $exitCode)." -ForegroundColor Cyan

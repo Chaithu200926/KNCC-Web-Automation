@@ -48,6 +48,12 @@ test('WEB-37 Preferences', async ({ page, step, testConfig }) => {
     await prefs.getByRole('button', { name: /^cancel$/i }).click(); // Cancel.
     // The site keeps the unsaved tick on screen until the page is reloaded (not part of its logic), so reload first.
     await page.reload({ waitUntil: 'domcontentloaded' }); // Fresh copy from the server.
+    // Pre-Prod (22 Oct 2026): the chat panel opens by itself a few seconds after the reload and covers the tabs, so
+    // wait for My Account and the chat to load before the tab is clicked (openAccountTab closes the chat).
+    await expect(page.locator('.account-left').filter({ visible: true }).getByText(/welcome back/i)).toBeVisible({ timeout: 30_000 });
+    await page.locator('#pair-ai-widget-iframe').waitFor({ state: 'attached', timeout: 15_000 }).catch(() => undefined); // No chat: go on.
+    await page.waitForTimeout(3_000); // The chat panel opens shortly after its frame loads.
+    await page.evaluate(() => window.scrollTo(0, 0)); // Tabs below the header, not under it.
     await openAccountTab(page, 'PREFERENCES'); // PREFERENCES tab.
     await expect(page.getByText(/choose your preference/i).first()).toBeVisible({ timeout: 30_000 }); // Its introduction.
     await expect.poll(async () => ageRating.evaluateAll((boxes) => boxes.map((box) => (box as HTMLInputElement).checked)),

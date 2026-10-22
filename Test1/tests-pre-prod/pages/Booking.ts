@@ -323,7 +323,8 @@ export async function tryProceedFromSeatMap(page: Page): Promise<'food' | 'payme
   const bookingsFound = bookingsFoundDialog(page); // Shown when the account already has a booking for this show.
   const message = page.locator('.swal-overlay--show-modal .swal-modal, .swal2-popup').filter({ visible: true }).first(); // A message on the seat map.
   const leftOrMessage = async () => !/\/seatlayout/.test(page.url()) || await message.isVisible(); // The site has answered.
-  await expect.poll(async () => await leftOrMessage() || await bookingsFound.isVisible(), { timeout: 30_000 }).toBe(true);
+  await expect.poll(async () => await leftOrMessage() || await bookingsFound.isVisible(),
+    { message: 'The site should answer PROCEED within 30 s (next page or a message)', timeout: 30_000 }).toBe(true);
   if (await bookingsFound.isVisible()) { // Book again anyway:
     await bookingsFound.getByRole('button', { name: /continue booking/i }).click(); // Continue booking,
     await expect.poll(leftOrMessage, { timeout: 30_000 }).toBe(true); // then wait for the answer.

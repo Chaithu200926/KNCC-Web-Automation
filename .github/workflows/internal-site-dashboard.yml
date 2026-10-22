@@ -1,0 +1,104 @@
+# Internal Site Dashboard: builds the dashboard of a test run on one of the internal websites (UAT :8103,
+# Pre-UAT :8123, Pre-Prod :8113) on GitHub's own runner.
+#
+# The internal websites are on the office network only, so the tests run on the QA PC (scripts/run-site.ps1).
+# scripts/publish-site-results.ps1 then pushes the run's results.json, screenshots and videos to the branch
+# site-results/<site> and starts this workflow. Traces and the Playwright HTML report are never sent (they record
+# typed values: password, OTP, card details).
+#
+# Results:
+#   * a results table on the run page (job summary),
+#   * the dashboard as a downloadable artifact "dashboard-<site>" (kept 30 days), with the trend of earlier runs,
+#   * the run goes red when any test failed.
+name: Internal Site Dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      site:
+        description: Website whose published results to use (branch site-results/<site>)
+        type: choice
+        options: [pre-prod, pre-uat, uat]
+        default: pre-prod
+
+# Only reads the code and the results branch.
+permissions:
+  contents: read
+
+jobs:
+  dashboard:
+    name: Build the ${{ inputs.site }} dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Test1
+    steps:
+      # Get the code (the dashboard script).
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # Get the results published from the QA PC into Test1/test-results-<site>.
+      - name: Check out the published results
+        uses: actions/checkout@v4
+        with:
+          ref: site-results/${{ inputs.site }}
+          path: published
+
+      - name: Put the results in place
+        run: cp -r ../published/test-results-${{ inputs.site }} .
+
+      # Install Node.js and the exact package versions (the dashboard shows the Playwright version).
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: Test1/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Bring back this website's run history (for the trend chart) saved by the previous run.
+      - name: Restore run history
+        uses: actions/cache/restore@v4
+        with:
+          path: Test1/.history-${{ inputs.site }}
+          key: internal-${{ inputs.site }}-history-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: internal-${{ inputs.site }}-history-
+
+      # Build the dashboard and put the results table on this run page.
+      - name: Build dashboard and run summary
+        env:
+          RESULTS_FILE: test-results-${{ inputs.site }}/results.json
+          DASHBOARD_DIR: dashboard-${{ inputs.site }}
+          HISTORY_FILE: .history-${{ inputs.site }}/history.json
+          SITE: ${{ inputs.site }}
+        run: |
+          case "$SITE" in
+            uat) export SITE_URL=http://10.35.1.66:8103 ;;
+            pre-uat) export SITE_URL=http://10.35.1.66:8123 ;;
+            pre-prod) export SITE_URL=http://10.35.1.66:8113 ;;
+          esac
+          node scripts/generate-dashboard.js
+
+      # Save the updated run history for the next run.
+      - name: Save run history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: Test1/.history-${{ inputs.site }}
+          key: internal-${{ inputs.site }}-history-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Keep the dashboard downloadable.
+      - name: Upload the dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-${{ inputs.site }}
+          path: Test1/dashboard-${{ inputs.site }}/
+          retention-days: 30
+
+      # Mark the run red if any test failed (after the dashboard is saved).
+      - name: Fail the run if any test failed
+        run: |
+          node -e "const s = require('./test-results-${{ inputs.site }}/results.json').stats; console.log(s.expected + ' passed, ' + s.unexpected + ' failed, ' + s.flaky + ' flaky, ' + s.skipped + ' skipped'); if (s.unexpected) { console.log('::error::' + s.unexpected + ' test(s) failed. See the summary above or the dashboard artifact.'); process.exit(1); }"
