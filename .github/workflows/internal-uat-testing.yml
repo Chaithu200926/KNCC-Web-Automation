@@ -1,6 +1,7 @@
 # Internal UAT Testing: runs the website test cases WEB-01..WEB-48 against the internal UAT website
 # (http://10.35.1.66:8103, specs in Test1/tests-uat) and/or the internal Pre-UAT website (http://10.35.1.66:8123,
-# specs in Test1/tests-pre-uat), one test at a time, each in a new incognito browser context.
+# specs in Test1/tests-pre-uat) or the internal Pre-Prod website (http://10.35.1.66:8113, specs in Test1/tests-pre-prod),
+# one test at a time, each in a new incognito browser context.
 #
 # The internal websites are on the office network only, so GitHub's own runners cannot reach them: this workflow
 # runs on the QA PC through a self-hosted runner with the label "web-uat" (started with run.cmd from its own
@@ -20,7 +21,7 @@ on:
       site:
         description: Website to test
         type: choice
-        options: [uat, pre-uat, both]
+        options: [uat, pre-uat, pre-prod, both]
         default: uat
       tests:
         description: Only these cases (e.g. "WEB-07 WEB-25"); empty = all WEB-01..48
@@ -63,7 +64,7 @@ jobs:
         env:
           SITE: ${{ inputs.site }}
         run: |
-          $urls = @{ 'uat' = 'http://10.35.1.66:8103'; 'pre-uat' = 'http://10.35.1.66:8123' }
+          $urls = @{ 'uat' = 'http://10.35.1.66:8103'; 'pre-uat' = 'http://10.35.1.66:8123'; 'pre-prod' = 'http://10.35.1.66:8113' }
           $names = if ($env:SITE -eq 'both') { @('uat', 'pre-uat') } else { @($env:SITE) }
           foreach ($name in $names) {
             try { $null = Invoke-WebRequest -Uri $urls[$name] -UseBasicParsing -TimeoutSec 20; Write-Host "$name website OK: $($urls[$name])" }
@@ -108,10 +109,13 @@ jobs:
           path: |
             Test1/dashboard-uat/
             Test1/dashboard-pre-uat/
+            Test1/dashboard-pre-prod/
             Test1/playwright-report-uat/
             Test1/playwright-report-pre-uat/
+            Test1/playwright-report-pre-prod/
             Test1/test-results-uat/
             Test1/test-results-pre-uat/
+            Test1/test-results-pre-prod/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -120,7 +124,7 @@ jobs:
         if: always()
         run: |
           $failed = 0
-          foreach ($file in @('test-results-uat/results.json', 'test-results-pre-uat/results.json')) {
+          foreach ($file in @('test-results-uat/results.json', 'test-results-pre-uat/results.json', 'test-results-pre-prod/results.json')) {
             if (Test-Path $file) {
               $stats = (Get-Content $file -Raw | ConvertFrom-Json).stats
               Write-Host "$file : $($stats.expected) passed, $($stats.unexpected) failed, $($stats.flaky) flaky, $($stats.skipped) skipped"

@@ -5,6 +5,7 @@
   Examples (from the Test1 folder):
     .\scripts\run-site.ps1 -Site uat                 # UAT website      http://10.35.1.66:8103
     .\scripts\run-site.ps1 -Site pre-uat             # Pre-UAT website  http://10.35.1.66:8123
+    .\scripts\run-site.ps1 -Site pre-prod            # Pre-Prod website http://10.35.1.66:8113 (not in the checklist)
     .\scripts\run-site.ps1 -Site both                # UAT, then Pre-UAT
     .\scripts\run-site.ps1 -Site uat -Tests web-07   # Only some cases (file name filter)
 
@@ -15,7 +16,7 @@
     test-results-<site>\                   Raw files: results.json, results.xml, test-execution.log.txt, videos, screenshots
 #>
 param(
-  [ValidateSet('uat', 'pre-uat', 'both')] [string] $Site = 'both',
+  [ValidateSet('uat', 'pre-uat', 'pre-prod', 'both')] [string] $Site = 'both',
   [string[]] $Tests = @(),
   [switch] $NoOpen,
   # UAT / Pre-UAT checklist (WEB-01..48, one column per site), rebuilt after every run.
@@ -27,7 +28,7 @@ $Tests = @($Tests | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim(
 
 $root = Split-Path -Parent $PSScriptRoot # The Test1 folder.
 Set-Location $root
-$sites = @{ 'uat' = 'http://10.35.1.66:8103'; 'pre-uat' = 'http://10.35.1.66:8123' }
+$sites = @{ 'uat' = 'http://10.35.1.66:8103'; 'pre-uat' = 'http://10.35.1.66:8123'; 'pre-prod' = 'http://10.35.1.66:8113' }
 $toRun = if ($Site -eq 'both') { @('uat', 'pre-uat') } else { @($Site) }
 
 # KNET test PIN must be 4 digits on the payment page (the local .env value is not).
@@ -56,7 +57,7 @@ foreach ($name in $toRun) {
   Remove-Item Env:RESULTS_FILE, Env:DASHBOARD_DIR, Env:SITE_URL
 
   # This run's results into the UAT / Pre-UAT checklist (cases not in this run keep their last result).
-  if (Test-Path "test-results-$name/results.json") { node scripts/build-site-checklist.js --add $name --out $Checklist }
+  if ($name -ne 'pre-prod' -and (Test-Path "test-results-$name/results.json")) { node scripts/build-site-checklist.js --add $name --out $Checklist }
 
   $minutes = [math]::Round(((Get-Date) - $started).TotalMinutes, 1)
   Write-Host "$name finished in $minutes min (exit code $exitCode)." -ForegroundColor Cyan

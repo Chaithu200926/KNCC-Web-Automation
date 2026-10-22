@@ -5,9 +5,11 @@ node_modules/
 /test-results/
 /test-results-uat/
 /test-results-pre-uat/
+/test-results-pre-prod/
 /playwright-report/
 /playwright-report-uat/
 /playwright-report-pre-uat/
+/playwright-report-pre-prod/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
@@ -17,6 +19,7 @@ node_modules/
 /.history/
 /dashboard-uat/
 /dashboard-pre-uat/
+/dashboard-pre-prod/
 # Merged UAT / Pre-UAT results behind the checklist (scripts/build-site-checklist.js).
 /site-checklist/
 # Local-only files: zipped report folders (too big for GitHub), one-off probe scripts, editor workspace.

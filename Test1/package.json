@@ -16,6 +16,8 @@
     "portal": "node team-portal/server.js",
     "site:uat": "powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site uat",
     "site:pre-uat": "powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site pre-uat",
+    "site:pre-prod": "powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site pre-prod",
+    "test:pre-prod": "playwright test -c playwright.pre-prod.config.ts",
     "site:both": "powershell -ExecutionPolicy Bypass -File scripts/run-site.ps1 -Site both"
   },
   "keywords": [],
